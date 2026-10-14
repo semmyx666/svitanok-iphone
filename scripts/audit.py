@@ -24,7 +24,8 @@ assert not (root / "server/.env").exists()
 assert len(list((root / "ios/Svitanok").glob("*.swift"))) == 7
 assert (root / "ios/Svitanok/Assets.xcassets/AppIcon.appiconset/AppIcon.png").exists()
 workflow = yaml.safe_load((root / ".github/workflows/build-ios.yml").read_text())
-assert workflow["on"] == {"workflow_dispatch": None}
+assert set(workflow["on"]) == {"workflow_dispatch"}
+assert workflow["on"]["workflow_dispatch"]["inputs"]["probe_only"]["type"] == "boolean"
 assert workflow["jobs"]["build"]["runs-on"] == "macos-26"
 assert workflow["permissions"] == {"contents": "read"}
 assert "secrets." not in (root / ".github/workflows/build-ios.yml").read_text()

@@ -10,10 +10,11 @@ final class NightProbeTests:XCTestCase {
         XCTAssertTrue(button.waitForExistence(timeout:10)); button.tap()
         let spring=XCUIApplication(bundleIdentifier:"com.apple.springboard")
         for _ in 0..<15 {
-            let allow=spring.buttons.matching(NSPredicate(format:"label CONTAINS[c] %@ OR label CONTAINS[c] %@", "Allow","Разрешить")).firstMatch
+            let allow=spring.buttons.matching(NSPredicate(format:"label == %@ OR label == %@", "Allow","Разрешить")).firstMatch
             if allow.exists { allow.tap() }
             Thread.sleep(forTimeInterval:1)
         }
+        let ready=XCTAttachment(screenshot:app.screenshot());ready.name="07a-before-lock-night-state";ready.lifetime = .keepAlways;add(ready)
         // External driver presses a real simulated LOCK hardware button, not just Home.
         // It independently verifies task launch, background checks, lease, release and alerting.
         XCUIDevice.shared.press(.home)

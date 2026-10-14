@@ -20,14 +20,14 @@ final class NightRunner {
         }
     }
     func begin(_ plan: Plan) {
-        guard !active, registered else { status = "Фон не запущен. Обычный сигнал сохранён."; return }
+        guard !active, registered else { status = "Фон не запущен. Обычный сигнал сохранён."; log("task.not_registered"); return }
         let identifier = (Bundle.main.bundleIdentifier ?? "ua.semmyx.svitanok") + ".night." + plan.groupID.uuidString
         guard identifier.hasPrefix("ua.semmyx.svitanok.") else { status = "Подписывающая программа изменила ID несовместимо с фоном. Сигнал по времени сохранён."; return }
         group = plan.groupID; requestID = identifier
         let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: "Світанок · проверка тревоги", subtitle: "До сигнала и отбоя · можно остановить")
         request.strategy = .fail
         do { try BGTaskScheduler.shared.submit(request); status = "Запуск фона запрошен. Пока не подтверждён — перенос запрещён."; log("task.requested") }
-        catch { status = "iOS не разрешила фон: \(error.localizedDescription). Сигнал по времени сохранён."; log("task.rejected") }
+        catch { status = "iOS не разрешила фон: \(error.localizedDescription). Сигнал по времени сохранён."; log("task.rejected",extra:["error":error.localizedDescription,"domain":(error as NSError).domain,"code":(error as NSError).code]) }
     }
     private func accept(_ raw: BGTask) {
         guard let continued = raw as? BGContinuedProcessingTask, let owner,
