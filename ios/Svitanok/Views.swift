@@ -12,69 +12,93 @@ extension Color {
 
 struct HomeView: View {
     @Bindable var model: AppModel
+    @State private var editingTime = false
+    @State private var choosingLocation = false
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 20) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("СВІТАНОК").font(.caption.weight(.bold)).tracking(4).foregroundStyle(Color.sky)
-                        Text("Утро без спешки").font(.title2.weight(.semibold))
+                        Text("Твоё утро").font(.title.bold())
                     }
                     Spacer()
-                    Image(systemName: "sunrise.fill").font(.system(size: 30)).foregroundStyle(Color.peach)
+                    Image(systemName: "sunrise.fill").font(.system(size: 32)).foregroundStyle(Color.peach)
                 }
-                VStack(alignment: .leading, spacing: 14) {
-                    Label(model.plan == nil ? "Ближайший будильник" : (model.setupVerified ? "Системный сигнал установлен" : "Проверьте системные сигналы"), systemImage: "alarm.fill")
-                        .font(.subheadline).foregroundStyle(Color.muted)
-                    Text((model.plan?.target ?? model.selectedDate).formatted(.dateTime.hour().minute()))
-                        .font(.system(size: 70, weight: .light, design: .rounded)).monospacedDigit()
-                        .minimumScaleFactor(0.6).lineLimit(1)
-                    Text((model.plan?.target ?? model.selectedDate).formatted(date: .abbreviated, time: .omitted))
-                        .foregroundStyle(Color.muted)
-                    Divider().overlay(Color.white.opacity(0.12))
-                    Label(model.displayedRegionName, systemImage: "location.fill")
-                        .foregroundStyle(Color.sky)
-                    Text(model.plan?.experimental == true ? "Перенос экспериментальный · только при открытом приложении" : "По времени · даже без интернета")
-                        .font(.subheadline).foregroundStyle(Color.muted)
-                    if let p = model.plan, p.experimental {
-                        Text("Предельный сигнал: \(p.deadline.formatted(date: .omitted, time: .shortened))")
-                            .font(.subheadline.weight(.semibold)).foregroundStyle(Color.peach)
-                    }
-                }.padding(24).background(Color.panel, in: RoundedRectangle(cornerRadius: 20))
-                VStack(alignment: .leading, spacing: 10) {
-                    Label(model.statusText, systemImage: statusIcon)
-                        .foregroundStyle(statusColor).font(.headline)
-                    Text(model.networkMessage).font(.subheadline).foregroundStyle(Color.muted)
-                    Text("Статус выбранной области, не подтверждение безопасности. Официальные оповещения имеют приоритет.")
-                        .font(.subheadline).foregroundStyle(Color.muted)
-                    Button("Обновить статус") { Task { await model.refresh(force: true) } }
-                        .buttonStyle(.bordered).tint(.sky).disabled(model.busy)
-                }.padding(20).background(Color.panel, in: RoundedRectangle(cornerRadius: 16))
-                if model.plan == nil {
+                Button { editingTime = true } label: {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Когда разбудить").font(.headline)
-                        DatePicker("Дата и время", selection: $model.selectedDate, in: Date.now..., displayedComponents: [.date, .hourAndMinute])
-                            .datePickerStyle(.compact).tint(.sky)
-                        Text("Одно срабатывание. После него установите следующее. Время — в часовом поясе iPhone.")
-                            .font(.subheadline).foregroundStyle(Color.muted)
+                        HStack {
+                            Label(model.plan == nil ? "ВЫБЕРИ ВРЕМЯ" : "БУДИЛЬНИК", systemImage: "alarm.fill")
+                                .font(.caption.weight(.bold)).tracking(1)
+                            Spacer()
+                            if model.plan == nil { Image(systemName: "pencil.circle.fill").font(.title2) }
+                        }.foregroundStyle(Color.sky)
+                        Text((model.plan?.target ?? model.selectedDate).formatted(.dateTime.hour().minute()))
+                            .font(.system(size: 92, weight: .semibold, design: .rounded)).monospacedDigit()
+                            .minimumScaleFactor(0.55).lineLimit(1).foregroundStyle(.white)
+                        Text((model.plan?.target ?? model.selectedDate).formatted(date: .abbreviated, time: .omitted))
+                            .font(.headline).foregroundStyle(Color.muted)
+                        if model.plan == nil {
+                            Label("Нажми здесь, чтобы изменить", systemImage: "hand.tap")
+                                .font(.subheadline.weight(.semibold)).foregroundStyle(Color.sky)
+                        } else {
+                            Label(model.setupVerified ? "Сигнал подтверждён системой" : "Установка требует проверки", systemImage: model.setupVerified ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .font(.subheadline).foregroundStyle(Color.peach)
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
+                        .background(Color.panel, in: RoundedRectangle(cornerRadius: 24))
+                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.sky.opacity(0.5), lineWidth: 1))
+                }.buttonStyle(.plain).disabled(model.plan != nil).accessibilityIdentifier("choose-time")
+                Button { choosingLocation = true } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "location.circle.fill").font(.title).foregroundStyle(Color.sky)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Моя местность").font(.caption).foregroundStyle(Color.muted)
+                            Text(model.displayedRegionName).font(.headline).foregroundStyle(.white)
+                        }
+                        Spacer()
+                        if model.plan == nil { Image(systemName: "chevron.right").foregroundStyle(Color.sky) }
+                    }.padding(18).background(Color.panel, in: RoundedRectangle(cornerRadius: 18))
+                }.buttonStyle(.plain).disabled(model.plan != nil).accessibilityIdentifier("choose-location-home")
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(model.statusText, systemImage: statusIcon).font(.headline).foregroundStyle(statusColor)
+                    Text(model.networkMessage).font(.subheadline).foregroundStyle(Color.muted)
+                    Button("Проверить связь") { Task { await model.refresh(force: true) } }
+                        .buttonStyle(.bordered).tint(.sky).disabled(model.busy)
+                }.padding(18).background(Color.panel, in: RoundedRectangle(cornerRadius: 18))
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("С заблокированным экраном", systemImage: "lock.fill").font(.headline)
+                    Text("Работает обычный сигнал по времени. Автоматическое ожидание отбоя в фоне в этой версии НЕ работает.")
+                        .font(.subheadline).foregroundStyle(Color.peach)
+                    if let plan = model.plan, plan.experimental {
+                        Text("Резерв: \(plan.deadline.formatted(date: .omitted, time: .shortened)). Он может прозвучать даже во время тревоги.")
+                            .font(.subheadline).foregroundStyle(Color.peach)
                     }
+                }.padding(18).background(Color.peach.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
+                if model.plan == nil {
                     Button { Task { await model.arm() } } label: {
-                        Label(model.busy ? "Устанавливаю…" : "Установить будильник", systemImage: "alarm")
-                            .frame(maxWidth: .infinity).padding(.vertical, 12)
-                    }.buttonStyle(.borderedProminent).tint(.sky).foregroundStyle(Color.night).disabled(model.busy)
-                    Button("Тест через 2 минуты") { Task { await model.arm(test: true) } }
-                        .buttonStyle(.bordered).tint(.peach).disabled(model.busy)
+                        Label(model.busy ? "Устанавливаю…" : "Включить будильник", systemImage: "alarm.fill")
+                            .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 16)
+                    }.buttonStyle(.borderedProminent).tint(.sky).foregroundStyle(Color.night)
+                        .disabled(model.busy).accessibilityIdentifier("arm-alarm")
+                    Button { Task { await model.arm(test: true) } } label: {
+                        Label("Проверить звук через 2 минуты", systemImage: "speaker.wave.2.fill")
+                            .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 12)
+                    }.buttonStyle(.bordered).tint(.peach).disabled(model.busy)
+                    Text("Срабатывает один раз. Для следующего утра поставь новый сигнал.")
+                        .font(.subheadline).foregroundStyle(Color.muted)
                 } else {
                     Button(role: .destructive) { model.disarm() } label: {
-                        Text("Отключить будильник и резерв").frame(maxWidth: .infinity).padding(.vertical, 10)
+                        Text("Отключить будильник и резерв").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 12)
                     }.buttonStyle(.bordered).disabled(model.busy)
                 }
-                Text(model.message).font(.subheadline).foregroundStyle(Color.muted)
-                    .accessibilityLabel("Состояние: \(model.message)")
-                Label("Прототип 0.2 · не заменяет сирены", systemImage: "exclamationmark.shield")
+                if !model.message.isEmpty { Text(model.message).font(.subheadline).foregroundStyle(Color.muted) }
+                Label("Версия 0.3 · не заменяет оповещения о тревоге", systemImage: "exclamationmark.shield")
                     .font(.subheadline).foregroundStyle(Color.peach)
-            }.padding(24)
+            }.padding(20)
         }.background(Color.night)
+            .sheet(isPresented: $editingTime) { TimeEditor(date: $model.selectedDate) }
+            .sheet(isPresented: $choosingLocation) { LocationPicker(model: model) }
     }
     private var statusIcon: String {
         switch model.currentStatus { case .active, .partial: "exclamationmark.triangle.fill"; case .clear: "checkmark.circle"; case .unknown: "questionmark.circle" }
@@ -84,51 +108,133 @@ struct HomeView: View {
     }
 }
 
-struct SettingsView: View {
-    @Bindable var model: AppModel
+struct TimeEditor: View {
+    @Binding var date: Date
+    @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
             Form {
-                Section("Регион") {
-                    Picker("Область или город", selection: $model.prefs.region) {
-                        ForEach(Region.all) { Text($0.name).tag($0.id) }
+                Section("Во сколько разбудить") {
+                    DatePicker("Время сигнала", selection: $date, displayedComponents: [.hourAndMinute])
+                        .datePickerStyle(.wheel).labelsHidden().frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("time-wheel")
+                }
+                Section("В какой день") {
+                    DatePicker("Дата", selection: $date, in: Date.now..., displayedComponents: [.date])
+                        .datePickerStyle(.graphical)
+                    Text("Время по настройкам iPhone. Выбери будущую дату: минимум через минуту.")
+                        .font(.subheadline).foregroundStyle(Color.muted)
+                }
+            }.scrollContentBackground(.hidden).background(Color.night)
+                .navigationTitle("Время будильника").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Готово") { dismiss() } } }
+        }.tint(.sky)
+    }
+}
+
+struct LocationPicker: View {
+    @Bindable var model: AppModel
+    @State private var query = ""
+    @Environment(\.dismiss) private var dismiss
+    private var locations: [AlertLocation] {
+        let matching = AlertLocation.all.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || String($0.id) == query }
+        return matching.sorted { a, b in
+            let priorities = [36, 155, 37]
+            let ai = priorities.firstIndex(of: a.id) ?? 10, bi = priorities.firstIndex(of: b.id) ?? 10
+            if ai != bi { return ai < bi }
+            return a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+    }
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("Выбери район или громаду. Область целиком и отдельный район — разные пункты. Здесь только местности из справочника источника, не все населённые пункты.")
+                        .font(.subheadline).foregroundStyle(Color.muted)
+                }
+                Section("Районы, громады и области") {
+                    ForEach(locations) { location in
+                        Button {
+                            model.prefs.locationUID = location.id
+                            model.snapshot = nil
+                            model.savePreferences()
+                            model.lastAttempt = .distantPast
+                            dismiss()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(location.name).foregroundStyle(.white)
+                                    Text("\(location.kind) · UID \(location.id)").font(.caption).foregroundStyle(Color.muted)
+                                }
+                                Spacer()
+                                if model.prefs.locationUID == location.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.sky) }
+                            }.padding(.vertical, 5)
+                        }.accessibilityIdentifier("location-\(location.id)")
                     }
-                    Text("Киев и Киевская область — разные регионы. Частичная тревога считается активной для всей выбранной области.")
-                        .foregroundStyle(Color.muted)
+                }
+                if locations.isEmpty { Text("Не найдено. Попробуй название на украинском, например «Вінницький».") }
+            }.scrollContentBackground(.hidden).background(Color.night)
+                .searchable(text: $query, prompt: "Например: Вінницький")
+                .navigationTitle("Выбери местность").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Закрыть") { dismiss() } } }
+        }.tint(.sky)
+    }
+}
+
+struct SettingsView: View {
+    @Bindable var model: AppModel
+    @State private var choosingLocation = false
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Где проверять тревогу") {
+                    Button { choosingLocation = true } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Выбрать район или громаду").font(.headline)
+                            Text(AlertLocation.find(model.prefs.locationUID)?.name ?? Region.all[model.prefs.region].name)
+                                .foregroundStyle(Color.muted)
+                        }.padding(.vertical, 6)
+                    }.accessibilityIdentifier("choose-location-settings")
+                    Text("Например: Вінницький район — отдельно от Гайсинського. Если тревогу объявили для всей области, следуй официальным оповещениям независимо от выбранного района.")
+                        .font(.subheadline).foregroundStyle(Color.muted)
+                }
+                Section("Как работает будильник") {
+                    Label("Обычный сигнал работает с закрытым экраном", systemImage: "lock.fill")
+                    Toggle("Ждать отбоя при открытом приложении", isOn: $model.prefs.experimental)
+                    Text("Эксперимент. НЕ работает автоматически при заблокированном экране или закрытом приложении. Если нужен обычный будильник — оставь переключатель выключенным.")
+                        .font(.subheadline).foregroundStyle(Color.peach)
+                    if model.prefs.experimental {
+                        Picker("Разбудить не позднее чем через", selection: $model.prefs.maxDelayMinutes) {
+                            Text("30 минут").tag(30); Text("1 час").tag(60); Text("2 часа").tag(120)
+                        }
+                        Text("Пример: сигнал 06:30, предел 1 час → резерв 07:30, даже если тревога продолжается. Отбой после 06:30 → новый сигнал через 5 секунд после получения свежих данных.")
+                            .font(.subheadline).foregroundStyle(Color.muted)
+                    }
                 }
                 Section("Звук") {
                     Picker("Мелодия", selection: $model.prefs.sound) {
-                        Text("Системная").tag("system")
-                        Text("Рассвет").tag("dawn")
-                        Text("Импульс").tag("pulse")
+                        Text("Системная").tag("system"); Text("Рассвет").tag("dawn"); Text("Импульс").tag("pulse")
                     }
-                    Button("Послушать мелодию") { model.previewSound() }
-                    Text("Громкость регулируется средствами iPhone. Проверяйте звук на устройстве; приложение не обещает менять системную громкость.")
-                        .foregroundStyle(Color.muted)
+                    Button("Послушать выбранный звук") { model.previewSound() }
+                    Text("Громкость меняется средствами iPhone. Перед первым использованием проверь сигнал кнопкой «через 2 минуты» и заблокируй экран.")
+                        .font(.subheadline).foregroundStyle(Color.muted)
                 }
-                Section("Ожидание отбоя · эксперимент") {
-                    Toggle("Перенос при подтверждённой тревоге", isOn: $model.prefs.experimental)
-                    Picker("Максимальное ожидание", selection: $model.prefs.maxDelayMinutes) {
-                        Text("30 минут").tag(30); Text("1 час").tag(60); Text("2 часа").tag(120)
-                    }
-                    Text("Проверка за 30–3 секунды до сигнала, только пока приложение открыто и активно. Если экран заблокирован, интернет пропал или данные устарели — сигнал по времени. После переноса резерв прозвучит в предельное время даже при продолжающейся тревоге.")
-                        .foregroundStyle(Color.peach)
-                    Text("Будильник не сообщает, что можно выходить из укрытия. Следуйте официальным рекомендациям.")
-                        .foregroundStyle(Color.muted)
-                }
-                Section("Источник данных") {
-                    TextField("https://ваш-сервер.example", text: $model.prefs.serverURL)
+                Section("Подключение данных тревог") {
+                    TextField("HTTPS-адрес сервера", text: $model.prefs.serverURL)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                    Text("Адрес вашего HTTPS-прокси. API-токен хранится только на сервере, не в приложении. Без сервера обычный будильник работает, перенос — нет.")
-                        .foregroundStyle(Color.muted)
-                    Link("Запросить токен alerts.in.ua", destination: URL(string: "https://alerts.in.ua/api-request")!)
+                    Text("Пока сервер не настроен, приложение НЕ получает тревоги и отбои. Для районов нужен сервер 0.3 из нового архива. Токен alerts.in.ua хранится на сервере, не здесь.")
+                        .font(.subheadline).foregroundStyle(Color.muted)
+                    Button("Проверить подключение") { Task { await model.refresh(force: true) } }
+                    Text(model.networkMessage).font(.subheadline).foregroundStyle(Color.peach)
+                    Link("Запросить API-токен у источника", destination: URL(string: "https://alerts.in.ua/api-request")!)
                 }
-                Section("Важно") {
-                    Text("Настройки применяются к следующему установленному сигналу. Чтобы изменить текущий, отключите его и установите заново.")
-                    Text("Не используйте прототип как единственный будильник перед школой. Оставьте отдельный резерв в приложении «Часы».")
+                Section("Важно знать") {
+                    Text("Настройки относятся к следующему сигналу. Текущий отключи и установи заново, чтобы применить изменения.")
+                    Text("Это не приложение гражданской защиты. «Нет тревоги» не подтверждает безопасность. Не отключай официальные оповещения и резерв в «Часах».")
+                    Text("Версия 0.3: проверяется в симуляторе. Ночные испытания на реальном iPhone ещё не выполнены.")
                 }
-            }.scrollContentBackground(.hidden).background(Color.night)
-                .navigationTitle("Настройки")
+            }.scrollContentBackground(.hidden).background(Color.night).navigationTitle("Настройки")
+                .sheet(isPresented: $choosingLocation) { LocationPicker(model: model) }
         }.onChange(of: model.prefs.region) { _, _ in model.savePreferences() }
             .onChange(of: model.prefs.sound) { _, _ in model.savePreferences() }
             .onChange(of: model.prefs.experimental) { _, _ in model.savePreferences() }

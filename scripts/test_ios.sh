@@ -17,7 +17,11 @@ for runtime,devices in r["devices"].items():
             print(d["udid"]);sys.exit(0)
 sys.exit("Установите iOS 26+ Simulator в Xcode Settings → Components.")
 ')"
+RESULT_PATH="build/Tests-$(date +%Y%m%d-%H%M%S).xcresult"
 xcodebuild -project Svitanok.xcodeproj -scheme Svitanok \
   -destination "platform=iOS Simulator,id=$SIM_ID" \
-  -derivedDataPath build/test -resultBundlePath "build/Tests-$(date +%Y%m%d-%H%M%S).xcresult" \
+  -derivedDataPath build/test -resultBundlePath "$RESULT_PATH" \
   CODE_SIGNING_ALLOWED=NO test
+
+mkdir -p build/logs/ui-screenshots
+xcrun xcresulttool export attachments --path "$RESULT_PATH" --output-path build/logs/ui-screenshots

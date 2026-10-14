@@ -15,15 +15,39 @@ struct Region: Identifiable, Sendable {
     ].enumerated().map { Region(id: $0.offset, name: $0.element) }
 }
 
+struct AlertLocation: Codable, Identifiable, Hashable, Sendable {
+    let id: Int
+    let name: String
+    let kind: String
+    static let all: [AlertLocation] = {
+        guard let url = Bundle.main.url(forResource: "locations", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let rows = try? JSONDecoder().decode([AlertLocation].self, from: data),
+              Set(rows.map(\.id)).count == rows.count else { return [] }
+        return rows
+    }()
+    static func find(_ uid: Int?) -> AlertLocation? {
+        guard let uid else { return nil }
+        return all.first { $0.id == uid }
+    }
+}
+
 enum AlertStatus: String, Codable, Sendable { case active, partial, clear, unknown }
 struct Snapshot: Codable, Sendable {
     let fetchedAt: Double
-    let statuses: [AlertStatus]
+    let statuses: [AlertStatus]?
+    var locationUID: Int? = nil
+    var locationStatus: AlertStatus? = nil
     let source: String
-    func status(region: Int, now: Date) -> AlertStatus {
+    func status(region: Int, uid: Int? = nil, now: Date) -> AlertStatus {
         let age = now.timeIntervalSince1970 - fetchedAt
-        guard fetchedAt.isFinite, age >= -5, age <= 45, statuses.count == 27,
-              statuses.indices.contains(region), source == "alerts.in.ua" else { return .unknown }
+        guard fetchedAt.isFinite, age >= -5, age <= 45, source == "alerts.in.ua" else { return .unknown }
+        if let uid {
+            guard locationUID == uid, AlertLocation.find(uid) != nil else { return .unknown }
+            return locationStatus ?? .unknown
+        }
+        guard locationUID == nil, let statuses, statuses.count == 27,
+              statuses.indices.contains(region) else { return .unknown }
         return statuses[region]
     }
 }
@@ -36,6 +60,7 @@ struct Plan: Codable, Sendable {
     var target: Date
     var maxDelayMinutes: Int
     var region: Int
+    var locationUID: Int? = nil
     var experimental: Bool
     var sound: String
     var deferred = false
@@ -63,6 +88,7 @@ enum AlarmPolicy {
 
 struct Preferences: Codable, Sendable {
     var region = 9
+    var locationUID: Int? = nil
     var experimental = false
     var maxDelayMinutes = 60
     var sound = "system"

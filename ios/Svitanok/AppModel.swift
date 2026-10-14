@@ -23,14 +23,16 @@ final class AppModel {
         let calendar = Calendar.current
         selectedDate = calendar.nextDate(after: .now, matching: DateComponents(hour: 6, minute: 30), matchingPolicy: .nextTime) ?? Date.now.addingTimeInterval(3600)
         if !Region.all.indices.contains(prefs.region) { prefs.region = 9 }
+        if prefs.locationUID != nil && AlertLocation.find(prefs.locationUID) == nil { prefs.locationUID = nil }
         if ![30, 60, 120].contains(prefs.maxDelayMinutes) { prefs.maxDelayMinutes = 60 }
         if !["system", "dawn", "pulse"].contains(prefs.sound) { prefs.sound = "system" }
     }
     var displayedRegionName: String {
+        if let location = AlertLocation.find(plan != nil ? plan?.locationUID : prefs.locationUID) { return location.name }
         let region = plan?.region ?? prefs.region
         return Region.all.first(where: { $0.id == region })?.name ?? "Неизвестный регион"
     }
-    var currentStatus: AlertStatus { snapshot?.status(region: prefs.region, now: .now) ?? .unknown }
+    var currentStatus: AlertStatus { snapshot?.status(region: plan?.region ?? prefs.region, uid: plan != nil ? plan?.locationUID : prefs.locationUID, now: .now) ?? .unknown }
     var statusText: String {
         switch currentStatus {
         case .active: "Воздушная тревога"
@@ -71,8 +73,9 @@ final class AppModel {
             guard target.timeIntervalSinceNow >= 60 else { message = "Выберите время минимум через минуту."; return }
             if prefs.experimental && !test { _ = try endpoint() }
             try await service.authorize()
-            let p = Plan(target: target, maxDelayMinutes: prefs.maxDelayMinutes, region: prefs.region,
+            var p = Plan(target: target, maxDelayMinutes: prefs.maxDelayMinutes, region: prefs.region,
                          experimental: test ? false : prefs.experimental, sound: prefs.sound)
+            p.locationUID = prefs.locationUID
             // Persist intent identity before any schedule, including partial-failure states.
             Persistence.save(p, key: "plan"); plan = p; setupVerified = false
             do {
@@ -112,6 +115,13 @@ final class AppModel {
               components.query == nil, components.fragment == nil,
               components.path.isEmpty || components.path == "/",
               let base = components.url else { throw WakeError.invalidURL }
+        if let uid = plan != nil ? plan?.locationUID : prefs.locationUID {
+            guard AlertLocation.find(uid) != nil else { throw WakeError.invalidResponse }
+            var result = URLComponents(url: base.appendingPathComponent("v2/status"), resolvingAgainstBaseURL: false)!
+            result.queryItems = [URLQueryItem(name: "uid", value: String(uid))]
+            guard let url = result.url else { throw WakeError.invalidURL }
+            return url
+        }
         return base.appendingPathComponent("v1/status")
     }
     func refresh(force: Bool = false) async {
@@ -127,13 +137,13 @@ final class AppModel {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count < 16_384 else { throw WakeError.invalidResponse }
             let candidate = try JSONDecoder().decode(Snapshot.self, from: data)
-            guard candidate.status(region: prefs.region, now: .now) != .unknown else { throw WakeError.invalidResponse }
+            guard candidate.status(region: plan?.region ?? prefs.region, uid: plan != nil ? plan?.locationUID : prefs.locationUID, now: .now) != .unknown else { throw WakeError.invalidResponse }
             guard isForeground, UIApplication.shared.applicationState == .active else { return }
             snapshot = candidate; networkMessage = "Свежие данные · alerts.in.ua"
             await evaluate()
         } catch {
             snapshot = nil
-            networkMessage = "Нет свежих данных — перенос запрещён"
+            networkMessage = prefs.serverURL.isEmpty ? "Источник не подключён. Будильник работает только по времени." : "Нет свежих данных. Для районов нужен сервер версии 0.3. Перенос сейчас недоступен."
         }
     }
     private func evaluate() async {
@@ -141,7 +151,7 @@ final class AppModel {
         busy = true; defer { busy = false }
         do {
             let ids = try service.ids()
-            let status = snapshot?.status(region: p.region, now: .now) ?? .unknown
+            let status = snapshot?.status(region: p.region, uid: p.locationUID, now: .now) ?? .unknown
             let decision = AlarmPolicy.decide(plan: p, status: status, now: .now,
                                                foreground: isForeground, backupVerified: try service.canDefer(p))
             switch decision {

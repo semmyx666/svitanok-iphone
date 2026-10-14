@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+from pathlib import Path
+from urllib.parse import urlsplit, parse_qs
 import threading
 import time
 import urllib.error
@@ -12,6 +14,10 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 UPSTREAM = "https://api.alerts.in.ua/v1/iot/active_air_raid_alerts_by_oblast.json"
+LOCATION_UPSTREAM = "https://api.alerts.in.ua/v2/iot/active_air_raid_alerts.json"
+LOCATION_STATUS = {"R": "active", "Y": "active", "P": "partial", "N": "clear", " ": "unknown"}
+LOCATIONS = {x["id"] for x in json.loads(Path(__file__).with_name("locations.json").read_text())}
+
 STATUS = {"A": "active", "P": "partial", "N": "clear"}
 MIN_INTERVAL = 15.0
 MAX_BYTES = 16_384
@@ -26,10 +32,19 @@ def parse_feed(payload: bytes) -> list[str]:
     return [STATUS[c] for c in code]
 
 
-def fetch_upstream(token: str) -> bytes:
+def parse_locations(payload: bytes) -> list[str]:
+    if len(payload) > MAX_BYTES:
+        raise ValueError("response too large")
+    code = json.loads(payload)
+    if not isinstance(code, str) or not max(LOCATIONS) < len(code) <= MAX_BYTES or any(c not in LOCATION_STATUS for c in code):
+        raise ValueError("unexpected location feed")
+    return [LOCATION_STATUS[c] for c in code]
+
+
+def fetch_upstream(token: str, endpoint: str = UPSTREAM) -> bytes:
     if not token:
         raise ValueError("missing API token")
-    request = urllib.request.Request(UPSTREAM, headers={
+    request = urllib.request.Request(endpoint, headers={
         "Authorization": f"Bearer {token}", "Accept": "application/json",
         "User-Agent": "SvitanokPrototype/0.1"
     })
@@ -40,7 +55,8 @@ def fetch_upstream(token: str) -> bytes:
 
 
 class FeedCache:
-    def __init__(self, token: str, fetcher=fetch_upstream, clock=time.time):
+    def __init__(self, token: str, fetcher=fetch_upstream, clock=time.time, parser=parse_feed):
+        self.parser = parser
         self.token = token
         self.fetcher = fetcher
         self.clock = clock
@@ -58,7 +74,7 @@ class FeedCache:
                 return 503, {"error": "upstream_unavailable", "retryAfter": max(1, int(self.next_allowed - now))}
             self.next_allowed = now + MIN_INTERVAL
             try:
-                statuses = parse_feed(self.fetcher(self.token))
+                statuses = self.parser(self.fetcher(self.token))
                 checked = self.clock()
                 self.cached = {"fetchedAt": checked, "statuses": statuses, "source": "alerts.in.ua"}
                 self.failures = 0
@@ -79,7 +95,7 @@ class FeedCache:
                 return 503, {"error": "upstream_unavailable", "retryAfter": int(backoff)}
 
 
-def make_handler(cache: FeedCache):
+def make_handler(cache: FeedCache, location_cache: FeedCache | None = None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "SvitanokProxy/0.1"
         def do_GET(self):
@@ -88,6 +104,20 @@ def make_handler(cache: FeedCache):
                 self.reply(200, {"service": "svitanok", "version": "0.1"})
             elif self.path == "/v1/status":
                 code, body = cache.get()
+                self.reply(code, body)
+            elif urlsplit(self.path).path == "/v2/status":
+                args = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
+                values = args.get("uid", [])
+                if set(args) != {"uid"} or len(values) != 1 or not values[0].isascii() or not values[0].isdigit() or len(values[0]) > 5 or int(values[0]) not in LOCATIONS:
+                    self.reply(400, {"error": "invalid_location"})
+                    return
+                if location_cache is None:
+                    self.reply(503, {"error": "location_feed_not_configured", "retryAfter": 15})
+                    return
+                code, body = location_cache.get()
+                if code == 200:
+                    uid = int(values[0])
+                    body = {"fetchedAt": body["fetchedAt"], "source": "alerts.in.ua", "locationUID": uid, "locationStatus": body["statuses"][uid]}
                 self.reply(code, body)
             else:
                 self.reply(404, {"error": "not_found"})
@@ -114,7 +144,7 @@ def main():
         raise SystemExit("Set ALERTS_TOKEN in the server environment; do not put it in the app.")
     host = os.environ.get("BIND_HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8080"))
-    server = ThreadingHTTPServer((host, port), make_handler(FeedCache(token)))
+    server = ThreadingHTTPServer((host, port), make_handler(FeedCache(token), FeedCache(token, fetcher=lambda t: fetch_upstream(t, LOCATION_UPSTREAM), parser=parse_locations)))
     print(f"Svitanok proxy listening on {host}:{port}", flush=True)
     server.serve_forever()
 
