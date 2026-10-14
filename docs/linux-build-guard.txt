@@ -1,0 +1,2 @@
+PASS: Linux build stops explicitly; no fake IPA produced.
+Этот шаг выполняется на macOS, например в бесплатном GitHub Actions.

@@ -1,0 +1,17 @@
+.env
+*.xcodeproj/
+build/
+DerivedData/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Never publish signing credentials or temporary artifacts
+dist/
+out/
+*.p12
+*.mobileprovision
+*.ipa
+*.ipa.partial
+*.xcresult/
+*.log

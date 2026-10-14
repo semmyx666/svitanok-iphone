@@ -1,0 +1,63 @@
+name: Build iPhone IPA (unsigned)
+"on":
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: svitanok-ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    # Standard runner, NOT macos-26-large/xlarge. Public repo standard minutes are free.
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Check Apple SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/logs
+          xcodebuild -version | tee build/logs/xcode-version.txt
+          SDK_MAJOR="$(xcrun --sdk iphoneos --show-sdk-version | cut -d. -f1)"
+          test "$SDK_MAJOR" -ge 26
+          xcrun simctl list devices available > build/logs/simulators.txt
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Run backend and packaging tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s server/tests -v 2>&1 | tee build/logs/backend-tests.txt
+          python3 -m unittest discover -s scripts/tests -v 2>&1 | tee build/logs/packaging-tests.txt
+      - name: Compile app and run Swift tests on Simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/test_ios.sh 2>&1 | tee build/logs/swift-tests.txt
+      - name: Build arm64 iPhone app and package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/build_unsigned_ipa.sh 2>&1 | tee build/logs/ipa-build.txt
+      - name: Upload IPA only after successful tests and build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Svitanok-unsigned-IPA
+          path: |
+            dist/Svitanok-unsigned.ipa
+            dist/SHA256SUMS.txt
+            dist/BUILD_STATUS.txt
+          if-no-files-found: error
+          retention-days: 3
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Svitanok-build-logs
+          path: build/logs/
+          if-no-files-found: warn
+          retention-days: 1

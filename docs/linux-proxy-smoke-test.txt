@@ -1,0 +1,3 @@
+PASS: actual Bash launcher + actual local Python health endpoint + mocked tunnel.
+Token not printed or forwarded to mocked tunnel; child process cleaned up.
+Not a live API or real Cloudflare test.
