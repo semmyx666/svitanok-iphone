@@ -1,0 +1,2 @@
+Structural audit passed: YAML, JSON, Bash syntax, sound resources, icon and no real .env. Swift compilation NOT tested.
+Location catalog and UI-test target verified.

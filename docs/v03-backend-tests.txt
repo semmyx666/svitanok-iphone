@@ -1,0 +1,122 @@
+test_correct_uid_returned (test_locations.LocationHTTPTests.test_correct_uid_returned) ... ok
+test_gaisyn_active (test_locations.LocationHTTPTests.test_gaisyn_active) ... ok
+test_no_oblast_substitution (test_locations.LocationHTTPTests.test_no_oblast_substitution) ... ok
+test_reject_invalid_requests (test_locations.LocationHTTPTests.test_reject_invalid_requests) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/tempfile.py:538: ResourceWarning: Implicitly cleaning up <HTTPError 400: 'Bad Request'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+ok
+test_same_fetched_timestamp_all_uids (test_locations.LocationHTTPTests.test_same_fetched_timestamp_all_uids) ... ok
+test_vinnytsia_clear_when_gaisyn_active (test_locations.LocationHTTPTests.test_vinnytsia_clear_when_gaisyn_active) ... ok
+test_all_catalog_ids_resolve_independently (test_locations.LocationTests.test_all_catalog_ids_resolve_independently) ... ok
+test_blank_is_unknown (test_locations.LocationTests.test_blank_is_unknown) ... ok
+test_catalog_unique_known_ids (test_locations.LocationTests.test_catalog_unique_known_ids) ... ok
+test_community_separate_uid (test_locations.LocationTests.test_community_separate_uid) ... ok
+test_error_body_rejected (test_locations.LocationTests.test_error_body_rejected) ... ok
+test_gaisyn_not_vinnytsia (test_locations.LocationTests.test_gaisyn_not_vinnytsia) ... ok
+test_partial_preserved (test_locations.LocationTests.test_partial_preserved) ... ok
+test_short_oblast_feed_rejected (test_locations.LocationTests.test_short_oblast_feed_rejected) ... ok
+test_truncated_full_feed_rejected (test_locations.LocationTests.test_truncated_full_feed_rejected) ... ok
+test_unknown_char_rejected (test_locations.LocationTests.test_unknown_char_rejected) ... ok
+test_vinnytsia_not_gaisyn (test_locations.LocationTests.test_vinnytsia_not_gaisyn) ... ok
+test_429_invalid_retry_header (test_proxy.CacheTests.test_429_invalid_retry_header) ... WARNING:root:Upstream unavailable (HTTPError)
+/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/tempfile.py:538: ResourceWarning: Implicitly cleaning up <HTTPError 429: ''>
+  _warnings.warn(self.warn_message, ResourceWarning)
+ok
+test_429_retry_after (test_proxy.CacheTests.test_429_retry_after) ... WARNING:root:Upstream unavailable (HTTPError)
+ok
+test_backoff_bounded (test_proxy.CacheTests.test_backoff_bounded) ... WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+ok
+test_caches_fifteen_seconds (test_proxy.CacheTests.test_caches_fifteen_seconds) ... ok
+test_clock_backwards_does_not_serve_future (test_proxy.CacheTests.test_clock_backwards_does_not_serve_future) ... ok
+test_concurrent_requests_share_one_fetch (test_proxy.CacheTests.test_concurrent_requests_share_one_fetch) ... ok
+test_failure_backoff (test_proxy.CacheTests.test_failure_backoff) ... WARNING:root:Upstream unavailable (TimeoutError)
+WARNING:root:Upstream unavailable (TimeoutError)
+ok
+test_failure_discards_prior_clear (test_proxy.CacheTests.test_failure_discards_prior_clear) ... WARNING:root:Upstream unavailable (ConnectionError)
+ok
+test_invalid_payload_unavailable (test_proxy.CacheTests.test_invalid_payload_unavailable) ... WARNING:root:Upstream unavailable (ValueError)
+ok
+test_new_fetch_after_window (test_proxy.CacheTests.test_new_fetch_after_window) ... ok
+test_recovers_after_failure (test_proxy.CacheTests.test_recovers_after_failure) ... WARNING:root:Upstream unavailable (TimeoutError)
+ok
+test_secret_not_logged (test_proxy.CacheTests.test_secret_not_logged) ... ok
+test_timeout_returns_unavailable (test_proxy.CacheTests.test_timeout_returns_unavailable) ... WARNING:root:Upstream unavailable (TimeoutError)
+ok
+test_timestamp_not_refreshed_for_cache (test_proxy.CacheTests.test_timestamp_not_refreshed_for_cache) ... ok
+test_valid_result (test_proxy.CacheTests.test_valid_result) ... ok
+test_health (test_proxy.HTTPTests.test_health) ... ok
+test_no_store (test_proxy.HTTPTests.test_no_store) ... ok
+test_post_disabled (test_proxy.HTTPTests.test_post_disabled) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/tempfile.py:538: ResourceWarning: Implicitly cleaning up <HTTPError 501: "Unsupported method ('POST')">
+  _warnings.warn(self.warn_message, ResourceWarning)
+ok
+test_query_string_not_endpoint (test_proxy.HTTPTests.test_query_string_not_endpoint) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/tempfile.py:538: ResourceWarning: Implicitly cleaning up <HTTPError 404: 'Not Found'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+ok
+test_status_endpoint (test_proxy.HTTPTests.test_status_endpoint) ... ok
+test_unknown_path (test_proxy.HTTPTests.test_unknown_path) ... ok
+test_all_active (test_proxy.ParserTests.test_all_active) ... ok
+test_all_clear (test_proxy.ParserTests.test_all_clear) ... ok
+test_all_partial (test_proxy.ParserTests.test_all_partial) ... ok
+test_boolean (test_proxy.ParserTests.test_boolean) ... ok
+test_dictionary (test_proxy.ParserTests.test_dictionary) ... ok
+test_empty (test_proxy.ParserTests.test_empty) ... ok
+test_injected_whitespace (test_proxy.ParserTests.test_injected_whitespace) ... ok
+test_invalid_code (test_proxy.ParserTests.test_invalid_code) ... ok
+test_invalid_encoding (test_proxy.ParserTests.test_invalid_encoding) ... ok
+test_list (test_proxy.ParserTests.test_list) ... ok
+test_long (test_proxy.ParserTests.test_long) ... ok
+test_lowercase (test_proxy.ParserTests.test_lowercase) ... ok
+test_malformed (test_proxy.ParserTests.test_malformed) ... ok
+test_null (test_proxy.ParserTests.test_null) ... ok
+test_oversized (test_proxy.ParserTests.test_oversized) ... ok
+test_region_slot_00 (test_proxy.ParserTests.test_region_slot_00) ... ok
+test_region_slot_01 (test_proxy.ParserTests.test_region_slot_01) ... ok
+test_region_slot_02 (test_proxy.ParserTests.test_region_slot_02) ... ok
+test_region_slot_03 (test_proxy.ParserTests.test_region_slot_03) ... ok
+test_region_slot_04 (test_proxy.ParserTests.test_region_slot_04) ... ok
+test_region_slot_05 (test_proxy.ParserTests.test_region_slot_05) ... ok
+test_region_slot_06 (test_proxy.ParserTests.test_region_slot_06) ... ok
+test_region_slot_07 (test_proxy.ParserTests.test_region_slot_07) ... ok
+test_region_slot_08 (test_proxy.ParserTests.test_region_slot_08) ... ok
+test_region_slot_09 (test_proxy.ParserTests.test_region_slot_09) ... ok
+test_region_slot_10 (test_proxy.ParserTests.test_region_slot_10) ... ok
+test_region_slot_11 (test_proxy.ParserTests.test_region_slot_11) ... ok
+test_region_slot_12 (test_proxy.ParserTests.test_region_slot_12) ... ok
+test_region_slot_13 (test_proxy.ParserTests.test_region_slot_13) ... ok
+test_region_slot_14 (test_proxy.ParserTests.test_region_slot_14) ... ok
+test_region_slot_15 (test_proxy.ParserTests.test_region_slot_15) ... ok
+test_region_slot_16 (test_proxy.ParserTests.test_region_slot_16) ... ok
+test_region_slot_17 (test_proxy.ParserTests.test_region_slot_17) ... ok
+test_region_slot_18 (test_proxy.ParserTests.test_region_slot_18) ... ok
+test_region_slot_19 (test_proxy.ParserTests.test_region_slot_19) ... ok
+test_region_slot_20 (test_proxy.ParserTests.test_region_slot_20) ... ok
+test_region_slot_21 (test_proxy.ParserTests.test_region_slot_21) ... ok
+test_region_slot_22 (test_proxy.ParserTests.test_region_slot_22) ... ok
+test_region_slot_23 (test_proxy.ParserTests.test_region_slot_23) ... ok
+test_region_slot_24 (test_proxy.ParserTests.test_region_slot_24) ... ok
+test_region_slot_25 (test_proxy.ParserTests.test_region_slot_25) ... ok
+test_region_slot_26 (test_proxy.ParserTests.test_region_slot_26) ... ok
+test_short (test_proxy.ParserTests.test_short) ... ok
+
+----------------------------------------------------------------------
+Ran 81 tests in 36.871s
+
+OK
