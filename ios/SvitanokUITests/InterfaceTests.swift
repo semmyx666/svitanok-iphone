@@ -14,6 +14,7 @@ final class InterfaceTests: XCTestCase {
     func testHomeHasLargeTimeControl() {
         XCTAssertTrue(app.buttons["choose-time"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["choose-location-home"].exists)
+        XCTAssertTrue(app.buttons["arm-alarm"].isHittable)
         capture("01-home-iPhone")
     }
     func testTimeWheelOpensAndCloses() {

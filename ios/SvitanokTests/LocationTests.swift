@@ -7,6 +7,12 @@ final class LocationTests: XCTestCase {
         Snapshot(fetchedAt: now.timeIntervalSince1970 - age, statuses: nil,
                  locationUID: uid, locationStatus: status, source: "alerts.in.ua")
     }
+    func testClockUses24HoursAndLeadingZero() {
+        let text = ClockText.format(now)
+        XCTAssertEqual(text.count, 5)
+        XCTAssertFalse(text.contains("AM")); XCTAssertFalse(text.contains("PM"))
+        XCTAssertEqual(text.filter { $0 == ":" }.count, 1)
+    }
     func testCatalogHas1622UniqueUIDs() {
         XCTAssertEqual(AlertLocation.all.count, 1622)
         XCTAssertEqual(Set(AlertLocation.all.map(\.id)).count, 1622)

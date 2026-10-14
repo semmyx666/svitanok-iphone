@@ -104,3 +104,13 @@ enum Persistence {
         if let data = try? JSONEncoder().encode(value) { UserDefaults.standard.set(data, forKey: key) }
     }
 }
+
+// Explicit 24-hour display; the device timezone is unchanged.
+enum ClockText {
+    static func format(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+}

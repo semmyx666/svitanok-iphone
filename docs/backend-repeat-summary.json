@@ -1,107 +1,127 @@
 {
-  "timestampUTC": "2026-10-14T13:14:49.871053+00:00",
+  "timestampUTC": "2026-10-14T18:49:48.050416+00:00",
   "suite": "Python backend + IPA packaging, synthetic fixtures, no iPhone, no actual iOS build or live API",
-  "testsPerRun": 84,
+  "testsPerRun": 101,
   "runs": [
     {
       "run": 1,
       "returncode": 0,
-      "elapsedSeconds": 0.678
+      "elapsedSeconds": 1.617,
+      "testExecutions": 101
     },
     {
       "run": 2,
       "returncode": 0,
-      "elapsedSeconds": 0.68
+      "elapsedSeconds": 1.573,
+      "testExecutions": 101
     },
     {
       "run": 3,
       "returncode": 0,
-      "elapsedSeconds": 0.676
+      "elapsedSeconds": 1.582,
+      "testExecutions": 101
     },
     {
       "run": 4,
       "returncode": 0,
-      "elapsedSeconds": 0.679
+      "elapsedSeconds": 1.705,
+      "testExecutions": 101
     },
     {
       "run": 5,
       "returncode": 0,
-      "elapsedSeconds": 0.676
+      "elapsedSeconds": 1.776,
+      "testExecutions": 101
     },
     {
       "run": 6,
       "returncode": 0,
-      "elapsedSeconds": 0.673
+      "elapsedSeconds": 1.857,
+      "testExecutions": 101
     },
     {
       "run": 7,
       "returncode": 0,
-      "elapsedSeconds": 0.676
+      "elapsedSeconds": 1.845,
+      "testExecutions": 101
     },
     {
       "run": 8,
       "returncode": 0,
-      "elapsedSeconds": 0.676
+      "elapsedSeconds": 1.827,
+      "testExecutions": 101
     },
     {
       "run": 9,
       "returncode": 0,
-      "elapsedSeconds": 0.678
+      "elapsedSeconds": 1.601,
+      "testExecutions": 101
     },
     {
       "run": 10,
       "returncode": 0,
-      "elapsedSeconds": 0.673
+      "elapsedSeconds": 1.561,
+      "testExecutions": 101
     },
     {
       "run": 11,
       "returncode": 0,
-      "elapsedSeconds": 0.673
+      "elapsedSeconds": 1.549,
+      "testExecutions": 101
     },
     {
       "run": 12,
       "returncode": 0,
-      "elapsedSeconds": 0.673
+      "elapsedSeconds": 1.851,
+      "testExecutions": 101
     },
     {
       "run": 13,
       "returncode": 0,
-      "elapsedSeconds": 0.717
+      "elapsedSeconds": 1.667,
+      "testExecutions": 101
     },
     {
       "run": 14,
       "returncode": 0,
-      "elapsedSeconds": 0.712
+      "elapsedSeconds": 1.595,
+      "testExecutions": 101
     },
     {
       "run": 15,
       "returncode": 0,
-      "elapsedSeconds": 0.681
+      "elapsedSeconds": 1.809,
+      "testExecutions": 101
     },
     {
       "run": 16,
       "returncode": 0,
-      "elapsedSeconds": 0.68
+      "elapsedSeconds": 1.62,
+      "testExecutions": 101
     },
     {
       "run": 17,
       "returncode": 0,
-      "elapsedSeconds": 0.673
+      "elapsedSeconds": 1.52,
+      "testExecutions": 101
     },
     {
       "run": 18,
       "returncode": 0,
-      "elapsedSeconds": 0.687
+      "elapsedSeconds": 1.542,
+      "testExecutions": 101
     },
     {
       "run": 19,
       "returncode": 0,
-      "elapsedSeconds": 0.671
+      "elapsedSeconds": 1.797,
+      "testExecutions": 101
     },
     {
       "run": 20,
       "returncode": 0,
-      "elapsedSeconds": 0.67
+      "elapsedSeconds": 1.809,
+      "testExecutions": 101
     }
   ],
   "allPassed": true

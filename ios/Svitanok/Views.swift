@@ -33,7 +33,7 @@ struct HomeView: View {
                             Spacer()
                             if model.plan == nil { Image(systemName: "pencil.circle.fill").font(.title2) }
                         }.foregroundStyle(Color.sky)
-                        Text((model.plan?.target ?? model.selectedDate).formatted(.dateTime.hour().minute()))
+                        Text(ClockText.format(model.plan?.target ?? model.selectedDate))
                             .font(.system(size: 92, weight: .semibold, design: .rounded)).monospacedDigit()
                             .minimumScaleFactor(0.55).lineLimit(1).foregroundStyle(.white)
                         Text((model.plan?.target ?? model.selectedDate).formatted(date: .abbreviated, time: .omitted))
@@ -60,22 +60,8 @@ struct HomeView: View {
                         if model.plan == nil { Image(systemName: "chevron.right").foregroundStyle(Color.sky) }
                     }.padding(18).background(Color.panel, in: RoundedRectangle(cornerRadius: 18))
                 }.buttonStyle(.plain).disabled(model.plan != nil).accessibilityIdentifier("choose-location-home")
-                VStack(alignment: .leading, spacing: 10) {
-                    Label(model.statusText, systemImage: statusIcon).font(.headline).foregroundStyle(statusColor)
-                    Text(model.networkMessage).font(.subheadline).foregroundStyle(Color.muted)
-                    Button("Проверить связь") { Task { await model.refresh(force: true) } }
-                        .buttonStyle(.bordered).tint(.sky).disabled(model.busy)
-                }.padding(18).background(Color.panel, in: RoundedRectangle(cornerRadius: 18))
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("С заблокированным экраном", systemImage: "lock.fill").font(.headline)
-                    Text("Работает обычный сигнал по времени. Автоматическое ожидание отбоя в фоне в этой версии НЕ работает.")
-                        .font(.subheadline).foregroundStyle(Color.peach)
-                    if let plan = model.plan, plan.experimental {
-                        Text("Резерв: \(plan.deadline.formatted(date: .omitted, time: .shortened)). Он может прозвучать даже во время тревоги.")
-                            .font(.subheadline).foregroundStyle(Color.peach)
-                    }
-                }.padding(18).background(Color.peach.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
                 if model.plan == nil {
+                    Text("С закрытым экраном — только сигнал по времени.").font(.subheadline).foregroundStyle(Color.peach)
                     Button { Task { await model.arm() } } label: {
                         Label(model.busy ? "Устанавливаю…" : "Включить будильник", systemImage: "alarm.fill")
                             .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 16)
@@ -92,6 +78,21 @@ struct HomeView: View {
                         Text("Отключить будильник и резерв").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 12)
                     }.buttonStyle(.bordered).disabled(model.busy)
                 }
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(model.statusText, systemImage: statusIcon).font(.headline).foregroundStyle(statusColor)
+                    Text(model.networkMessage).font(.subheadline).foregroundStyle(Color.muted)
+                    Button("Проверить связь") { Task { await model.refresh(force: true) } }
+                        .buttonStyle(.bordered).tint(.sky).disabled(model.busy)
+                }.padding(18).background(Color.panel, in: RoundedRectangle(cornerRadius: 18))
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("С заблокированным экраном", systemImage: "lock.fill").font(.headline)
+                    Text("Работает обычный сигнал по времени. Автоматическое ожидание отбоя в фоне в этой версии НЕ работает.")
+                        .font(.subheadline).foregroundStyle(Color.peach)
+                    if let plan = model.plan, plan.experimental {
+                        Text("Резерв: \(plan.deadline.formatted(date: .omitted, time: .shortened)). Он может прозвучать даже во время тревоги.")
+                            .font(.subheadline).foregroundStyle(Color.peach)
+                    }
+                }.padding(18).background(Color.peach.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
                 if !model.message.isEmpty { Text(model.message).font(.subheadline).foregroundStyle(Color.muted) }
                 Label("Версия 0.3 · не заменяет оповещения о тревоге", systemImage: "exclamationmark.shield")
                     .font(.subheadline).foregroundStyle(Color.peach)
@@ -128,7 +129,7 @@ struct TimeEditor: View {
             }.scrollContentBackground(.hidden).background(Color.night)
                 .navigationTitle("Время будильника").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Готово") { dismiss() } } }
-        }.tint(.sky)
+        }.tint(.sky).environment(\.locale, Locale(identifier: "ru_RU"))
     }
 }
 
