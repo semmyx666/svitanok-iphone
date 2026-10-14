@@ -32,6 +32,7 @@ final class AppModel {
         if prefs.locationUID != nil && AlertLocation.find(prefs.locationUID) == nil { prefs.locationUID = nil }
         if ![30, 60, 120].contains(prefs.maxDelayMinutes) { prefs.maxDelayMinutes = 60 }
         if !["system", "dawn", "pulse"].contains(prefs.sound) { prefs.sound = "system" }
+        if prefs.sleepAudio == nil { prefs.sleepAudio = true }
         night.connect(self)
     }
     var displayedRegionName: String {
@@ -83,15 +84,17 @@ final class AppModel {
             }
             let target = nightDemo ? Date.now.addingTimeInterval(90) : (test ? Date.now.addingTimeInterval(120) : selectedDate)
             guard target.timeIntervalSinceNow >= 60 else { message = "Выберите время минимум через минуту."; return }
-            if (prefs.experimental && !test) || nightDemo { _ = try endpoint() }
+            if prefs.experimental && !test && !nightDemo { _ = try endpoint() }
             if prefs.experimental && target.timeIntervalSinceNow > 12 * 3600 { message = "Ночной режим: время не дальше 12 часов. Для другого дня используйте обычный сигнал."; return }
             try await service.authorize()
             var p = Plan(target: target, maxDelayMinutes: nightDemo ? 5 : prefs.maxDelayMinutes, region: prefs.region,
                          experimental: nightDemo || (!test && prefs.experimental), sound: prefs.sound)
             p.nightMode = p.experimental
+            p.sleepAudio = p.experimental && (nightDemo || prefs.sleepAudio == true)
             if nightDemo { p.demoStart = .now }
             p.locationUID = prefs.locationUID ?? (prefs.dataSource == "public" ? PublicCatalog.oblastUID(for: prefs.region) : nil)
-            p.dataSource = prefs.dataSource
+            p.dataSource = nightDemo ? "public" : prefs.dataSource
+            if nightDemo { p.locationUID = prefs.locationUID ?? PublicCatalog.oblastUID(for:prefs.region) }
             // Persist intent identity before any schedule, including partial-failure states.
             Persistence.save(p, key: "plan"); plan = p; setupVerified = false
             do {
@@ -107,7 +110,7 @@ final class AppModel {
                 let ids = try service.ids()
                 guard ids.contains(p.primaryID), !p.experimental || ids.contains(p.backupID) else { throw WakeError.noBackup }
                 setupVerified = true
-                if p.nightMode == true { night.begin(p) }
+                if p.nightMode == true { night.begin(p, useSleepAudio: p.sleepAudio == true) }
                 message = nightDemo ? "ТЕСТ: искусственная тревога до 2-й минуты, затем искусственный отбой. Это не настоящие данные." : (test ? "Тестовый системный сигнал — через 2 минуты. Заблокируйте экран." : "Системный сигнал установлен. Один раз, в выбранную дату.")
             } catch {
                 // Keep any successfully scheduled backup; UI explicitly reports incomplete setup.

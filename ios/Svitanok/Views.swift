@@ -72,10 +72,10 @@ struct HomeView: View {
                             .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 12)
                     }.buttonStyle(.bordered).tint(.peach).disabled(model.busy)
                     Button { Task { await model.arm(nightDemo: true) } } label: {
-                        Label("Тест отбоя с закрытым экраном", systemImage: "moon.fill")
+                        Label("Тест отбоя · со звуком для сна", systemImage: "moon.fill")
                             .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 12)
                     }.buttonStyle(.bordered).tint(.sky).disabled(model.busy).accessibilityIdentifier("night-demo")
-                    Text("Этот тест использует искусственную тревогу и отбой, не реальные данные. Жди подтверждения фона, затем заблокируй экран. Около 2 минут.").font(.caption).foregroundStyle(Color.peach)
+                    Text("Тест включает тихий шум для сна и искусственные статусы. После «Ночной звук играет» заблокируй экран. Около 2 минут; это не настоящая тревога.").font(.caption).foregroundStyle(Color.peach)
                     Text("Срабатывает один раз. Для следующего утра поставь новый сигнал.")
                         .font(.subheadline).foregroundStyle(Color.muted)
                 } else {
@@ -91,7 +91,7 @@ struct HomeView: View {
                 }.padding(18).background(Color.panel, in: RoundedRectangle(cornerRadius: 18))
                 VStack(alignment: .leading, spacing: 8) {
                     Label("С заблокированным экраном", systemImage: "lock.fill").font(.headline)
-                    Text("Обычный сигнал работает по времени. Ночной режим пробует проверять отбой в фоне, только после подтверждения iOS. Если фон остановится, резерв может прозвучать даже во время тревоги.")
+                    Text("Обычный сигнал работает по времени. Ночной режим проверяет отбой во время звука для сна, даже при заблокированном экране. Дождись «Ночной звук играет». Если фон остановится, резерв может прозвучать даже во время тревоги.")
                         .font(.subheadline).foregroundStyle(Color.peach)
                     Text(model.nightStatus).font(.subheadline.weight(.semibold)).foregroundStyle(Color.sky).accessibilityIdentifier("night-state")
                     if let plan = model.plan, plan.experimental {
@@ -207,10 +207,12 @@ struct SettingsView: View {
                 }
                 Section("Как работает будильник") {
                     Label("Обычный сигнал работает с закрытым экраном", systemImage: "lock.fill")
-                    Toggle("Ночной режим · ждать отбоя", isOn: $model.prefs.experimental)
-                    Text("Эксперимент: iOS должна подтвердить запуск фона. Можно заблокировать экран после подтверждения. iOS может остановить проверки; тогда последний резерв прозвучит примерно в течение минуты, даже при тревоге. Если нужен обычный сигнал — оставь выключенным.")
+                    Toggle("Ночной режим · отбой со звуком для сна", isOn: $model.prefs.experimental)
+                    Text("Эксперимент: всю ночь играет настоящий тихий шум для сна. Пока он играет, приложение может проверять отбой с закрытым экраном. Звонок, остановка звука или закрытие приложения могут прервать проверки: тогда остаётся последний системный резерв, даже при тревоге. Это не полностью беззвучный ночной режим.")
                         .font(.subheadline).foregroundStyle(Color.peach)
                     if model.prefs.experimental {
+                        Toggle("Звук для сна (для фоновых проверок)", isOn: Binding(get: { model.prefs.sleepAudio != false }, set: { model.prefs.sleepAudio = $0; model.savePreferences() }))
+                        Text("Звук — отдельный мягкий шум, не мелодия будильника. Он будет играть до сигнала. Громкость — кнопками iPhone. Если выключить этот вариант, iOS может отказать в альтернативной фоновой задаче; основной сигнал тогда не переносится.").font(.subheadline).foregroundStyle(Color.muted).fixedSize(horizontal:false,vertical:true)
                         Picker("Разбудить не позднее чем через", selection: $model.prefs.maxDelayMinutes) {
                             Text("30 минут").tag(30); Text("1 час").tag(60); Text("2 часа").tag(120)
                         }

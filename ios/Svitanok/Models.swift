@@ -64,6 +64,7 @@ struct Plan: Codable, Sendable {
     var dataSource: String? = nil
     var experimental: Bool
     var nightMode: Bool? = nil
+    var sleepAudio: Bool? = nil
     var demoStart: Date? = nil
     var leaseIDs: [UUID]? = nil
     var currentLeaseID: UUID? = nil
@@ -97,6 +98,7 @@ struct Preferences: Codable, Sendable {
     var locationUID: Int? = nil
     var dataSource: String? = nil
     var experimental = false
+    var sleepAudio: Bool? = nil
     var maxDelayMinutes = 60
     var sound = "system"
     var serverURL = ""

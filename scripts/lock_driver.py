@@ -10,8 +10,8 @@ while time.monotonic()<end:
             records=[json.loads(l) for l in src.read_text().splitlines() if l]
             if any(r['event'] in ['task.rejected','task.not_registered'] for r in records):
                 sys.exit('NOT VERIFIED: iOS refused the task; see probe records.')
-            if any(r['event']=='task.started' for r in records):
-                time.sleep(18) # UI authorization completes, app is sent Home by XCTest.
+            if any(r['event']=='task.started' for r in records) and any(r['event']=='check' and r.get('background') is True for r in records):
+                # XCTest has already pressed Home; LOCK cannot be undone by a later Home press.
                 subprocess.run(['build/idb-env/bin/idb','ui','button','LOCK','--udid',sim],check=True)
                 (out/'locked.json').write_text(json.dumps({'time':time.time(),'method':'IDB HID LOCK','simulator':sim}))
                 subprocess.run(['xcrun','simctl','io',sim,'screenshot',str(out/'screen-locked.png')],check=True)
