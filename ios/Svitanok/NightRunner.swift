@@ -15,14 +15,17 @@ final class NightRunner {
     private var requestID: String?
     func connect(_ owner: AppModel) {
         self.owner = owner
-        registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: pattern, using: .main) { [weak self] task in
-            Task { @MainActor in self?.accept(task) }
-        }
+        // Continued tasks register the concrete submitted identifier, not the Info.plist wildcard.
+        // Registration is intentionally on the user's Start action, per Apple's continued-task guide.
     }
     func begin(_ plan: Plan) {
-        guard !active, registered else { status = "Фон не запущен. Обычный сигнал сохранён."; log("task.not_registered"); return }
+        guard !active else { status = "Фон не запущен. Обычный сигнал сохранён."; log("task.not_registered"); return }
         let identifier = (Bundle.main.bundleIdentifier ?? "ua.semmyx.svitanok") + ".night." + plan.groupID.uuidString
         guard identifier.hasPrefix("ua.semmyx.svitanok.") else { status = "Подписывающая программа изменила ID несовместимо с фоном. Сигнал по времени сохранён."; return }
+        registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { [weak self] task in
+            Task { @MainActor in self?.accept(task) }
+        }
+        guard registered else { status = "iOS не зарегистрировала фон. Сигнал по времени сохранён."; log("task.not_registered"); return }
         group = plan.groupID; requestID = identifier
         let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: "Світанок · проверка тревоги", subtitle: "До сигнала и отбоя · можно остановить")
         request.strategy = .fail

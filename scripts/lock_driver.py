@@ -8,6 +8,8 @@ while time.monotonic()<end:
         src=pathlib.Path(p.stdout.strip())/'Documents/night-probe.jsonl'
         if src.exists():
             records=[json.loads(l) for l in src.read_text().splitlines() if l]
+            if any(r['event'] in ['task.rejected','task.not_registered'] for r in records):
+                sys.exit('NOT VERIFIED: iOS refused the task; see probe records.')
             if any(r['event']=='task.started' for r in records):
                 time.sleep(18) # UI authorization completes, app is sent Home by XCTest.
                 subprocess.run(['build/idb-env/bin/idb','ui','button','LOCK','--udid',sim],check=True)
