@@ -17,6 +17,10 @@ final class AppModel {
     var lastAttempt: Date = .distantPast
     private var fetching = false
     private let service = AlarmService()
+    private let night = NightRunner()
+    var nightStatus: String { night.status }
+    var backgroundRunning: Bool { night.active }
+    private var executionAllowed: Bool { night.active || (isForeground && UIApplication.shared.applicationState == .active) }
     private var player: AVAudioPlayer?
 
     init() {
@@ -28,6 +32,7 @@ final class AppModel {
         if prefs.locationUID != nil && AlertLocation.find(prefs.locationUID) == nil { prefs.locationUID = nil }
         if ![30, 60, 120].contains(prefs.maxDelayMinutes) { prefs.maxDelayMinutes = 60 }
         if !["system", "dawn", "pulse"].contains(prefs.sound) { prefs.sound = "system" }
+        night.connect(self)
     }
     var displayedRegionName: String {
         if let location = AlertLocation.find(plan != nil ? plan?.locationUID : prefs.locationUID) { return location.name }
@@ -68,7 +73,7 @@ final class AppModel {
             }
         } catch { setupVerified = false; message = "Не удалось проверить системные сигналы: \(error.localizedDescription)" }
     }
-    func arm(test: Bool = false) async {
+    func arm(test: Bool = false, nightDemo: Bool = false) async {
         guard !busy else { return }
         busy = true; defer { busy = false }
         do {
@@ -76,12 +81,15 @@ final class AppModel {
                 message = "Сначала отключите текущий будильник. Изменения настроек не меняют уже установленный сигнал."
                 return
             }
-            let target = test ? Date.now.addingTimeInterval(120) : selectedDate
+            let target = nightDemo ? Date.now.addingTimeInterval(90) : (test ? Date.now.addingTimeInterval(120) : selectedDate)
             guard target.timeIntervalSinceNow >= 60 else { message = "Выберите время минимум через минуту."; return }
-            if prefs.experimental && !test { _ = try endpoint() }
+            if (prefs.experimental && !test) || nightDemo { _ = try endpoint() }
+            if prefs.experimental && target.timeIntervalSinceNow > 12 * 3600 { message = "Ночной режим: время не дальше 12 часов. Для другого дня используйте обычный сигнал."; return }
             try await service.authorize()
-            var p = Plan(target: target, maxDelayMinutes: prefs.maxDelayMinutes, region: prefs.region,
-                         experimental: test ? false : prefs.experimental, sound: prefs.sound)
+            var p = Plan(target: target, maxDelayMinutes: nightDemo ? 5 : prefs.maxDelayMinutes, region: prefs.region,
+                         experimental: nightDemo || (!test && prefs.experimental), sound: prefs.sound)
+            p.nightMode = p.experimental
+            if nightDemo { p.demoStart = .now }
             p.locationUID = prefs.locationUID ?? (prefs.dataSource == "public" ? PublicCatalog.oblastUID(for: prefs.region) : nil)
             p.dataSource = prefs.dataSource
             // Persist intent identity before any schedule, including partial-failure states.
@@ -99,7 +107,8 @@ final class AppModel {
                 let ids = try service.ids()
                 guard ids.contains(p.primaryID), !p.experimental || ids.contains(p.backupID) else { throw WakeError.noBackup }
                 setupVerified = true
-                message = test ? "Тестовый системный сигнал — через 2 минуты. Заблокируйте экран." : "Системный сигнал установлен. Один раз, в выбранную дату."
+                if p.nightMode == true { night.begin(p) }
+                message = nightDemo ? "ТЕСТ: искусственная тревога до 2-й минуты, затем искусственный отбой. Это не настоящие данные." : (test ? "Тестовый системный сигнал — через 2 минуты. Заблокируйте экран." : "Системный сигнал установлен. Один раз, в выбранную дату.")
             } catch {
                 // Keep any successfully scheduled backup; UI explicitly reports incomplete setup.
                 message = "Установка неполная: \(error.localizedDescription). Проверьте/отключите оставшиеся сигналы."
@@ -112,6 +121,7 @@ final class AppModel {
         guard let p = plan else { return }
         do {
             try service.cancel(plan: p)
+            night.finish(success:true,reason:"Будильник отключён")
             plan = nil; setupVerified = false; UserDefaults.standard.removeObject(forKey: "plan")
             message = "Будильник и резерв отключены."
         } catch { message = "Отключение не завершено: \(error.localizedDescription). Проверьте разрешение будильников." }
@@ -138,7 +148,17 @@ final class AppModel {
         return base.appendingPathComponent("v1/status")
     }
     func refresh(force: Bool = false) async {
-        guard isForeground, UIApplication.shared.applicationState == .active, !busy, !fetching else { return }
+        guard executionAllowed, !busy, !fetching else { return }
+        if let p = plan, p.demoStart != nil {
+            let now = Date.now
+            guard now.timeIntervalSince(lastAttempt) >= 15 else { return }
+            lastAttempt = now
+            let uid = queryLocationUID
+            snapshot = Snapshot(fetchedAt: now.timeIntervalSince1970, statuses:nil, locationUID:uid,
+                                locationStatus:now < p.target.addingTimeInterval(30) ? .active : .clear,source:"siren.pp.ua")
+            networkMessage = "ТЕСТ. Искусственные статусы, не настоящая тревога."
+            await evaluate(); return
+        }
         if ProcessInfo.processInfo.arguments.contains("--offline-ui-test") { networkMessage = "Проверка интерфейса без сети. Тревога и отбой не определены."; return }
         let now = Date.now
         guard force || now.timeIntervalSince(lastAttempt) >= 15 else { return }
@@ -160,7 +180,7 @@ final class AppModel {
             }
             guard candidate.source == (usesPublicSource ? "siren.pp.ua" : "alerts.in.ua"),
                   candidate.status(region: plan?.region ?? prefs.region, uid: queryLocationUID, now: .now) != .unknown else { throw WakeError.invalidResponse }
-            guard isForeground, UIApplication.shared.applicationState == .active else { return }
+            guard executionAllowed else { return }
             snapshot = candidate; networkMessage = usesPublicSource ? "Ответ UA Siren получен. Без ключа и своего сервера. Это сторонний источник, возможны задержки." : "Ответ alerts.in.ua получен через ваш сервер."
             await evaluate()
         } catch {
@@ -170,11 +190,15 @@ final class AppModel {
         }
     }
     private func evaluate() async {
-        guard !busy, isForeground, UIApplication.shared.applicationState == .active, var p = plan else { return }
+        guard !busy, executionAllowed, var p = plan else { return }
         busy = true; defer { busy = false }
         do {
             let ids = try service.ids()
             let status = snapshot?.status(region: p.region, uid: queryLocationUID, now: .now) ?? .unknown
+            if p.nightMode == true {
+                try await evaluateNight(&p, status:status)
+                return
+            }
             let decision = AlarmPolicy.decide(plan: p, status: status, now: .now,
                                                foreground: isForeground, backupVerified: try service.canDefer(p))
             switch decision {
@@ -201,6 +225,40 @@ final class AppModel {
                 message = "Сигнал после отбоя установлен через 5 секунд. «Я проснулся» отключит резерв."
             }
         } catch { message = "Перенос не завершён: \(error.localizedDescription). Системные сигналы не отключены массово." }
+    }
+    func releaseAlerting(_ p: Plan) -> Bool { (try? service.alerting(p.releaseID)) == true }
+    private func evaluateNight(_ p: inout Plan, status: AlertStatus) async throws {
+        let action = NightPolicy.decide(plan:p,status:status,now:.now,running:night.active,verified:try service.leaseVerified(p))
+        switch action {
+        case .keep: return
+        case .extendLease:
+            let oldID = p.deferred ? p.currentLeaseID : p.primaryID
+            let oldDue = p.deferred ? p.currentLeaseDue : p.target
+            guard let oldID, let oldDue else { return }
+            let id = UUID(); let due = Date.now.addingTimeInterval(60)
+            p.leaseIDs = (p.leaseIDs ?? []) + [id]
+            Persistence.save(p,key:"plan"); plan = p
+            // Replacement FIRST, cancellation LAST. Crash/rejection leaves an older system alarm.
+            try await service.schedule(id:id,at:due,title:"Світанок · проверка прервалась",plan:p)
+            guard Persistence.load(Plan.self,key:"plan")?.groupID == p.groupID else { try service.cancel(id:id); return }
+            guard night.active, try service.scheduled(id), try service.scheduled(p.backupID), oldDue.timeIntervalSinceNow > 3 else {
+                try service.cancel(id:id); return
+            }
+            p.currentLeaseID = id; p.currentLeaseDue = due; p.deferred = true
+            Persistence.save(p,key:"plan"); plan = p
+            try service.cancel(id:oldID)
+            night.log("lease.extended",extra:["due":due.timeIntervalSince1970])
+            message = "Тревога: сигнал отложен. Если проверки оборвутся, последний резерв прозвучит примерно в течение минуты."
+        case .release:
+            try await service.schedule(id:p.releaseID,at:.now.addingTimeInterval(5),title:"Світанок · источник сообщает отбой",plan:p)
+            guard Persistence.load(Plan.self,key:"plan")?.groupID == p.groupID else { try service.cancel(id:p.releaseID); return }
+            guard try service.scheduled(p.releaseID) else { throw WakeError.invalidResponse }
+            p.released = true; Persistence.save(p,key:"plan"); plan = p
+            // A confirmed release alarm exists before removing the short lease.
+            if let id=p.currentLeaseID, try service.scheduled(id) { try service.cancel(id:id) }
+            night.log("release.scheduled")
+            message = "Источник сообщил отбой. Системный сигнал установлен через 5 секунд."
+        }
     }
     func previewSound() {
         guard prefs.sound != "system", let url = Bundle.main.url(forResource: prefs.sound, withExtension: "wav") else {

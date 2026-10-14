@@ -38,6 +38,14 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/test_ios.sh 2>&1 | tee build/logs/swift-tests.txt
+      - name: Experimental hardware-LOCK all-clear probe (report separately)
+        id: night_probe
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/test_night.sh
+      - name: Record experiment outcome
+        if: always()
+        run: echo "Locked-screen experiment = ${{ steps.night_probe.outcome }}; not an overnight hardware guarantee" > build/logs/night-outcome.txt
       - name: Build arm64 iPhone app and package unsigned IPA
         shell: bash
         run: |

@@ -61,7 +61,7 @@ struct HomeView: View {
                     }.padding(18).background(Color.panel, in: RoundedRectangle(cornerRadius: 18))
                 }.buttonStyle(.plain).disabled(model.plan != nil).accessibilityIdentifier("choose-location-home")
                 if model.plan == nil {
-                    Text("С закрытым экраном — только сигнал по времени.").font(.subheadline).foregroundStyle(Color.peach)
+                    Text("Обычный сигнал — по времени. Ожидание отбоя: экспериментальный ночной режим в настройках.").font(.subheadline).foregroundStyle(Color.peach)
                     Button { Task { await model.arm() } } label: {
                         Label(model.busy ? "Устанавливаю…" : "Включить будильник", systemImage: "alarm.fill")
                             .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 16)
@@ -71,6 +71,11 @@ struct HomeView: View {
                         Label("Проверить звук через 2 минуты", systemImage: "speaker.wave.2.fill")
                             .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 12)
                     }.buttonStyle(.bordered).tint(.peach).disabled(model.busy)
+                    Button { Task { await model.arm(nightDemo: true) } } label: {
+                        Label("Тест отбоя с закрытым экраном", systemImage: "moon.fill")
+                            .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 12)
+                    }.buttonStyle(.bordered).tint(.sky).disabled(model.busy).accessibilityIdentifier("night-demo")
+                    Text("Этот тест использует искусственную тревогу и отбой, не реальные данные. Жди подтверждения фона, затем заблокируй экран. Около 2 минут.").font(.caption).foregroundStyle(Color.peach)
                     Text("Срабатывает один раз. Для следующего утра поставь новый сигнал.")
                         .font(.subheadline).foregroundStyle(Color.muted)
                 } else {
@@ -86,15 +91,16 @@ struct HomeView: View {
                 }.padding(18).background(Color.panel, in: RoundedRectangle(cornerRadius: 18))
                 VStack(alignment: .leading, spacing: 8) {
                     Label("С заблокированным экраном", systemImage: "lock.fill").font(.headline)
-                    Text("Работает обычный сигнал по времени. Автоматическое ожидание отбоя в фоне в этой версии НЕ работает.")
+                    Text("Обычный сигнал работает по времени. Ночной режим пробует проверять отбой в фоне, только после подтверждения iOS. Если фон остановится, резерв может прозвучать даже во время тревоги.")
                         .font(.subheadline).foregroundStyle(Color.peach)
+                    Text(model.nightStatus).font(.subheadline.weight(.semibold)).foregroundStyle(Color.sky).accessibilityIdentifier("night-state")
                     if let plan = model.plan, plan.experimental {
                         Text("Резерв: \(plan.deadline.formatted(date: .omitted, time: .shortened)). Он может прозвучать даже во время тревоги.")
                             .font(.subheadline).foregroundStyle(Color.peach)
                     }
                 }.padding(18).background(Color.peach.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
                 if !model.message.isEmpty { Text(model.message).font(.subheadline).foregroundStyle(Color.muted) }
-                Label("Версия 0.4 · не заменяет оповещения о тревоге", systemImage: "exclamationmark.shield")
+                Label("Версия 0.5 · не заменяет оповещения о тревоге", systemImage: "exclamationmark.shield")
                     .font(.subheadline).foregroundStyle(Color.peach)
             }.padding(20)
         }.background(Color.night)
@@ -201,8 +207,8 @@ struct SettingsView: View {
                 }
                 Section("Как работает будильник") {
                     Label("Обычный сигнал работает с закрытым экраном", systemImage: "lock.fill")
-                    Toggle("Ждать отбоя при открытом приложении", isOn: $model.prefs.experimental)
-                    Text("Эксперимент. НЕ работает автоматически при заблокированном экране или закрытом приложении. Если нужен обычный будильник — оставь переключатель выключенным.")
+                    Toggle("Ночной режим · ждать отбоя", isOn: $model.prefs.experimental)
+                    Text("Эксперимент: iOS должна подтвердить запуск фона. Можно заблокировать экран после подтверждения. iOS может остановить проверки; тогда последний резерв прозвучит примерно в течение минуты, даже при тревоге. Если нужен обычный сигнал — оставь выключенным.")
                         .font(.subheadline).foregroundStyle(Color.peach)
                     if model.prefs.experimental {
                         Picker("Разбудить не позднее чем через", selection: $model.prefs.maxDelayMinutes) {
@@ -225,8 +231,8 @@ struct SettingsView: View {
                         Text("Без ключа · UA Siren").tag(Optional("public"))
                         Text("Мой сервер · alerts.in.ua").tag(Optional("proxy"))
                     }.accessibilityIdentifier("source-picker")
-                    Text("UA Siren — публичный сторонний сервис. Ключ и свой сервер не нужны. Нужен интернет. Данные проверяются примерно каждые 15 секунд только при открытом приложении.")
-                        .font(.subheadline).foregroundStyle(Color.muted)
+                    Text("UA Siren — публичный сторонний сервис. Ключ и свой сервер не нужны. Нужен интернет. Проверка — примерно каждые 15 секунд: при открытом приложении или подтверждённом ночном фоне.")
+                        .font(.subheadline).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
                     if model.prefs.dataSource == "proxy" {
                     TextField("HTTPS-адрес сервера", text: $model.prefs.serverURL)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
@@ -241,7 +247,7 @@ struct SettingsView: View {
                 Section("Важно знать") {
                     Text("Настройки относятся к следующему сигналу. Текущий отключи и установи заново, чтобы применить изменения.")
                     Text("Это не приложение гражданской защиты. «Нет тревоги» не подтверждает безопасность. Не отключай официальные оповещения и резерв в «Часах».")
-                    Text("Версия 0.4: проверяется в симуляторе. Ночные испытания на реальном iPhone ещё не выполнены.")
+                    Text("Версия 0.5: проверяется в симуляторе. Короткий тест симулятора не заменяет ночное испытание на реальном iPhone.")
                 }
             }.scrollContentBackground(.hidden).background(Color.night).navigationTitle("Настройки")
                 .sheet(isPresented: $choosingLocation) { LocationPicker(model: model) }

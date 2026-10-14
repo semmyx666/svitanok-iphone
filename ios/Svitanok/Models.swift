@@ -63,11 +63,16 @@ struct Plan: Codable, Sendable {
     var locationUID: Int? = nil
     var dataSource: String? = nil
     var experimental: Bool
+    var nightMode: Bool? = nil
+    var demoStart: Date? = nil
+    var leaseIDs: [UUID]? = nil
+    var currentLeaseID: UUID? = nil
+    var currentLeaseDue: Date? = nil
     var sound: String
     var deferred = false
     var released = false
     var deadline: Date { target.addingTimeInterval(Double(maxDelayMinutes) * 60) }
-    var ids: [UUID] { [primaryID, backupID, releaseID] }
+    var ids: [UUID] { [primaryID, backupID, releaseID] + (leaseIDs ?? []) }
 }
 
 /// Pure policy. Any unknown status preserves the system alarm.
@@ -114,5 +119,19 @@ enum ClockText {
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
+    }
+}
+
+// A short system lease remains even if iOS kills monitoring without an expiration callback.
+enum NightDecision: Equatable { case keep, extendLease, release }
+enum NightPolicy {
+    static func decide(plan: Plan, status: AlertStatus, now: Date, running: Bool, verified: Bool) -> NightDecision {
+        guard plan.nightMode == true, plan.experimental, running, !plan.released, now < plan.deadline else { return .keep }
+        if plan.deferred && status == .clear && now >= plan.target { return .release }
+        guard verified, status == .active || status == .partial else { return .keep }
+        let due = plan.deferred ? plan.currentLeaseDue : plan.target
+        guard let due, due.timeIntervalSince(now) > 3, due.timeIntervalSince(now) <= 30,
+              now.addingTimeInterval(60) < plan.deadline else { return .keep }
+        return .extendLease
     }
 }

@@ -30,6 +30,15 @@ final class AlarmService {
         return alarms.contains(where: { $0.id == plan.primaryID && $0.state == .scheduled })
             && alarms.contains(where: { $0.id == plan.backupID && $0.state == .scheduled })
     }
+    func leaseVerified(_ p: Plan) throws -> Bool {
+        let list = try manager.alarms
+        let id = p.deferred ? p.currentLeaseID : p.primaryID
+        guard let id else { return false }
+        return list.contains { $0.id == id && $0.state == .scheduled }
+            && list.contains { $0.id == p.backupID && $0.state == .scheduled }
+    }
+    func scheduled(_ id: UUID) throws -> Bool { try manager.alarms.contains { $0.id == id && $0.state == .scheduled } }
+    func alerting(_ id: UUID) throws -> Bool { try manager.alarms.contains { $0.id == id && $0.state == .alerting } }
     func schedule(id: UUID, at date: Date, title: String, plan: Plan) async throws {
         let stop = AlarmButton(text: "Я проснулся", textColor: .white, systemImageName: "checkmark")
         let presentation = AlarmPresentation(alert: .init(title: LocalizedStringResource(stringLiteral: title), stopButton: stop))
