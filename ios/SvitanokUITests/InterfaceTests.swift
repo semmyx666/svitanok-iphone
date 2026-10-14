@@ -5,6 +5,7 @@ final class InterfaceTests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
+        app.launchArguments = ["--offline-ui-test"]
         app.launch()
     }
     private func capture(_ name: String) {

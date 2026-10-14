@@ -94,7 +94,7 @@ struct HomeView: View {
                     }
                 }.padding(18).background(Color.peach.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
                 if !model.message.isEmpty { Text(model.message).font(.subheadline).foregroundStyle(Color.muted) }
-                Label("Версия 0.3 · не заменяет оповещения о тревоге", systemImage: "exclamationmark.shield")
+                Label("Версия 0.4 · не заменяет оповещения о тревоге", systemImage: "exclamationmark.shield")
                     .font(.subheadline).foregroundStyle(Color.peach)
             }.padding(20)
         }.background(Color.night)
@@ -138,7 +138,7 @@ struct LocationPicker: View {
     @State private var query = ""
     @Environment(\.dismiss) private var dismiss
     private var locations: [AlertLocation] {
-        let matching = AlertLocation.all.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || String($0.id) == query }
+        let matching = AlertLocation.all.filter { (model.prefs.dataSource != "public" || PublicCatalog.find($0.id) != nil) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || String($0.id) == query) }
         return matching.sorted { a, b in
             let priorities = [36, 155, 37]
             let ai = priorities.firstIndex(of: a.id) ?? 10, bi = priorities.firstIndex(of: b.id) ?? 10
@@ -220,19 +220,28 @@ struct SettingsView: View {
                     Text("Громкость меняется средствами iPhone. Перед первым использованием проверь сигнал кнопкой «через 2 минуты» и заблокируй экран.")
                         .font(.subheadline).foregroundStyle(Color.muted)
                 }
-                Section("Подключение данных тревог") {
+                Section("Откуда брать данные тревог") {
+                    Picker("Источник", selection: $model.prefs.dataSource) {
+                        Text("Без ключа · UA Siren").tag(Optional("public"))
+                        Text("Мой сервер · alerts.in.ua").tag(Optional("proxy"))
+                    }
+                    Text("UA Siren — публичный сторонний сервис. Ключ и свой сервер не нужны. Нужен интернет. Данные проверяются примерно каждые 15 секунд только при открытом приложении.")
+                        .font(.subheadline).foregroundStyle(Color.muted)
+                    if model.prefs.dataSource == "proxy" {
                     TextField("HTTPS-адрес сервера", text: $model.prefs.serverURL)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
                     Text("Пока сервер не настроен, приложение НЕ получает тревоги и отбои. Для районов нужен сервер 0.3 из нового архива. Токен alerts.in.ua хранится на сервере, не здесь.")
                         .font(.subheadline).foregroundStyle(Color.muted)
+                    }
                     Button("Проверить подключение") { Task { await model.refresh(force: true) } }
                     Text(model.networkMessage).font(.subheadline).foregroundStyle(Color.peach)
-                    Link("Запросить API-токен у источника", destination: URL(string: "https://alerts.in.ua/api-request")!)
+                    if model.prefs.dataSource == "proxy" { Link("Запросить API-токен у источника", destination: URL(string: "https://alerts.in.ua/api-request")!) }
+                    Link("О публичном источнике UA Siren", destination: URL(string: "https://siren.pp.ua/")!)
                 }
                 Section("Важно знать") {
                     Text("Настройки относятся к следующему сигналу. Текущий отключи и установи заново, чтобы применить изменения.")
                     Text("Это не приложение гражданской защиты. «Нет тревоги» не подтверждает безопасность. Не отключай официальные оповещения и резерв в «Часах».")
-                    Text("Версия 0.3: проверяется в симуляторе. Ночные испытания на реальном iPhone ещё не выполнены.")
+                    Text("Версия 0.4: проверяется в симуляторе. Ночные испытания на реальном iPhone ещё не выполнены.")
                 }
             }.scrollContentBackground(.hidden).background(Color.night).navigationTitle("Настройки")
                 .sheet(isPresented: $choosingLocation) { LocationPicker(model: model) }
@@ -240,6 +249,7 @@ struct SettingsView: View {
             .onChange(of: model.prefs.sound) { _, _ in model.savePreferences() }
             .onChange(of: model.prefs.experimental) { _, _ in model.savePreferences() }
             .onChange(of: model.prefs.maxDelayMinutes) { _, _ in model.savePreferences() }
+            .onChange(of: model.prefs.dataSource) { _, _ in model.snapshot = nil; model.lastAttempt = .distantPast; model.savePreferences() }
             .onChange(of: model.prefs.serverURL) { _, _ in model.savePreferences() }
     }
 }

@@ -41,7 +41,7 @@ struct Snapshot: Codable, Sendable {
     let source: String
     func status(region: Int, uid: Int? = nil, now: Date) -> AlertStatus {
         let age = now.timeIntervalSince1970 - fetchedAt
-        guard fetchedAt.isFinite, age >= -5, age <= 45, source == "alerts.in.ua" else { return .unknown }
+        guard fetchedAt.isFinite, age >= -5, age <= 45, ["alerts.in.ua", "siren.pp.ua"].contains(source) else { return .unknown }
         if let uid {
             guard locationUID == uid, AlertLocation.find(uid) != nil else { return .unknown }
             return locationStatus ?? .unknown
@@ -61,6 +61,7 @@ struct Plan: Codable, Sendable {
     var maxDelayMinutes: Int
     var region: Int
     var locationUID: Int? = nil
+    var dataSource: String? = nil
     var experimental: Bool
     var sound: String
     var deferred = false
@@ -89,6 +90,7 @@ enum AlarmPolicy {
 struct Preferences: Codable, Sendable {
     var region = 9
     var locationUID: Int? = nil
+    var dataSource: String? = nil
     var experimental = false
     var maxDelayMinutes = 60
     var sound = "system"

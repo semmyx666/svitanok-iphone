@@ -21,7 +21,7 @@ for path in (root / "ios/Svitanok/Resources").glob("*.wav"):
         assert f.getnchannels() == 1 and f.getsampwidth() == 2
         assert 0 < f.getnframes() / f.getframerate() < 30
 assert not (root / "server/.env").exists()
-assert len(list((root / "ios/Svitanok").glob("*.swift"))) == 5
+assert len(list((root / "ios/Svitanok").glob("*.swift"))) == 6
 assert (root / "ios/Svitanok/Assets.xcassets/AppIcon.appiconset/AppIcon.png").exists()
 workflow = yaml.safe_load((root / ".github/workflows/build-ios.yml").read_text())
 assert workflow["on"] == {"workflow_dispatch": None}
@@ -37,3 +37,7 @@ locations = json.loads((root / "ios/Svitanok/Resources/locations.json").read_tex
 assert len(locations) == len({x["id"] for x in locations}) == 1622
 assert locations == json.loads((root / "server/locations.json").read_text())
 print("Location catalog and UI-test target verified.")
+
+public = json.loads((root / "ios/Svitanok/Resources/public-locations.json").read_text())
+assert len(public) == len({x["id"] for x in public}) == 1589
+print("Public source UID mapping validated.")

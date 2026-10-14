@@ -22,6 +22,7 @@ final class AppModel {
     init() {
         let calendar = Calendar.current
         selectedDate = calendar.nextDate(after: .now, matching: DateComponents(hour: 6, minute: 30), matchingPolicy: .nextTime) ?? Date.now.addingTimeInterval(3600)
+        if !["public", "proxy"].contains(prefs.dataSource ?? "") { prefs.dataSource = "public" }
         if !Region.all.indices.contains(prefs.region) { prefs.region = 9 }
         if prefs.locationUID != nil && AlertLocation.find(prefs.locationUID) == nil { prefs.locationUID = nil }
         if ![30, 60, 120].contains(prefs.maxDelayMinutes) { prefs.maxDelayMinutes = 60 }
@@ -32,12 +33,17 @@ final class AppModel {
         let region = plan?.region ?? prefs.region
         return Region.all.first(where: { $0.id == region })?.name ?? "Неизвестный регион"
     }
-    var currentStatus: AlertStatus { snapshot?.status(region: plan?.region ?? prefs.region, uid: plan != nil ? plan?.locationUID : prefs.locationUID, now: .now) ?? .unknown }
+    var usesPublicSource: Bool { (plan != nil ? (plan?.dataSource ?? "proxy") : prefs.dataSource) == "public" }
+    var queryLocationUID: Int? {
+        let uid = plan != nil ? plan?.locationUID : prefs.locationUID
+        return uid ?? (usesPublicSource ? PublicCatalog.oblastUID(for: plan?.region ?? prefs.region) : nil)
+    }
+    var currentStatus: AlertStatus { snapshot?.status(region: plan?.region ?? prefs.region, uid: queryLocationUID, now: .now) ?? .unknown }
     var statusText: String {
         switch currentStatus {
         case .active: "Воздушная тревога"
         case .partial: "Тревога в части области"
-        case .clear: "Источник не сообщает тревогу"
+        case .clear: "Источник не сообщает воздушную тревогу"
         case .unknown: "Статус неизвестен"
         }
     }
@@ -75,7 +81,8 @@ final class AppModel {
             try await service.authorize()
             var p = Plan(target: target, maxDelayMinutes: prefs.maxDelayMinutes, region: prefs.region,
                          experimental: test ? false : prefs.experimental, sound: prefs.sound)
-            p.locationUID = prefs.locationUID
+            p.locationUID = prefs.locationUID ?? (prefs.dataSource == "public" ? PublicCatalog.oblastUID(for: prefs.region) : nil)
+            p.dataSource = prefs.dataSource
             // Persist intent identity before any schedule, including partial-failure states.
             Persistence.save(p, key: "plan"); plan = p; setupVerified = false
             do {
@@ -109,6 +116,11 @@ final class AppModel {
         } catch { message = "Отключение не завершено: \(error.localizedDescription). Проверьте разрешение будильников." }
     }
     func endpoint() throws -> URL {
+        if usesPublicSource {
+            guard let uid = queryLocationUID, PublicCatalog.find(uid) != nil,
+                  let url = URL(string: "https://siren.pp.ua/api/v3/alerts/\(uid)") else { throw WakeError.invalidResponse }
+            return url
+        }
         guard let components = URLComponents(string: prefs.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)),
               components.scheme == "https", let host = components.host, !host.isEmpty,
               components.user == nil, components.password == nil,
@@ -126,6 +138,7 @@ final class AppModel {
     }
     func refresh(force: Bool = false) async {
         guard isForeground, UIApplication.shared.applicationState == .active, !busy, !fetching else { return }
+        if ProcessInfo.processInfo.arguments.contains("--offline-ui-test") { networkMessage = "Проверка интерфейса без сети. Тревога и отбой не определены."; return }
         let now = Date.now
         guard force || now.timeIntervalSince(lastAttempt) >= 15 else { return }
         lastAttempt = now
@@ -135,14 +148,23 @@ final class AppModel {
             var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count < 16_384 else { throw WakeError.invalidResponse }
-            let candidate = try JSONDecoder().decode(Snapshot.self, from: data)
-            guard candidate.status(region: plan?.region ?? prefs.region, uid: plan != nil ? plan?.locationUID : prefs.locationUID, now: .now) != .unknown else { throw WakeError.invalidResponse }
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw WakeError.invalidResponse }
+            let candidate: Snapshot
+            if usesPublicSource {
+                guard http.url?.host == "siren.pp.ua", http.url?.scheme == "https", let uid = queryLocationUID else { throw WakeError.invalidResponse }
+                candidate = try PublicAlerts.parse(data, uid: uid, serverDate: http.value(forHTTPHeaderField: "Date"), now: .now)
+            } else {
+                guard data.count < 16_384 else { throw WakeError.invalidResponse }
+                candidate = try JSONDecoder().decode(Snapshot.self, from: data)
+            }
+            guard candidate.source == (usesPublicSource ? "siren.pp.ua" : "alerts.in.ua"),
+                  candidate.status(region: plan?.region ?? prefs.region, uid: queryLocationUID, now: .now) != .unknown else { throw WakeError.invalidResponse }
             guard isForeground, UIApplication.shared.applicationState == .active else { return }
-            snapshot = candidate; networkMessage = "Свежие данные · alerts.in.ua"
+            snapshot = candidate; networkMessage = usesPublicSource ? "Ответ UA Siren получен. Без ключа и своего сервера. Это сторонний источник, возможны задержки." : "Ответ alerts.in.ua получен через ваш сервер."
             await evaluate()
         } catch {
             snapshot = nil
+            if usesPublicSource { networkMessage = "UA Siren недоступен или ответ не подтверждён. Тревога/отбой неизвестны. Не отключайте резерв."; return }
             networkMessage = prefs.serverURL.isEmpty ? "Источник не подключён. Будильник работает только по времени." : "Нет свежих данных. Для районов нужен сервер версии 0.3. Перенос сейчас недоступен."
         }
     }
@@ -151,7 +173,7 @@ final class AppModel {
         busy = true; defer { busy = false }
         do {
             let ids = try service.ids()
-            let status = snapshot?.status(region: p.region, uid: p.locationUID, now: .now) ?? .unknown
+            let status = snapshot?.status(region: p.region, uid: queryLocationUID, now: .now) ?? .unknown
             let decision = AlarmPolicy.decide(plan: p, status: status, now: .now,
                                                foreground: isForeground, backupVerified: try service.canDefer(p))
             switch decision {
