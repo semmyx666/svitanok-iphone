@@ -1,0 +1,15 @@
+{"event": "task.started", "method": "audible-sleep-audio", "time": 1792012602.121429}
+{"audio_playing": true, "background": false, "event": "check", "time": 1792012602.1651921}
+{"audio_playing": true, "background": false, "event": "check", "time": 1792012617.798331}
+{"audio_playing": true, "background": true, "event": "check", "time": 1792012634.0700521}
+{"audio_playing": true, "background": true, "event": "check", "time": 1792012649.6924129}
+{"due": 1792012725.44214, "event": "lease.extended", "time": 1792012666.202046}
+{"audio_playing": true, "background": true, "event": "check", "time": 1792012666.2078261}
+{"audio_playing": true, "background": true, "event": "check", "time": 1792012681.825935}
+{"due": 1792012757.524228, "event": "lease.extended", "time": 1792012697.596288}
+{"audio_playing": true, "background": true, "event": "check", "time": 1792012697.598259}
+{"audio_playing": true, "background": true, "event": "check", "time": 1792012713.136323}
+{"event": "release.scheduled", "time": 1792012729.088646}
+{"audio_playing": true, "background": true, "event": "check", "time": 1792012729.090163}
+{"event": "release.alerting", "time": 1792012735.925133}
+{"event": "task.completed", "time": 1792012736.8651462}

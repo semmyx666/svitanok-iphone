@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "missing_events": [],
+  "checks_after_LOCK_in_background": true,
+  "AlarmKit_alerting_after_LOCK": true,
+  "scope": "short synthetic all-clear; Simulator only, not overnight hardware/audio guarantee"
+}

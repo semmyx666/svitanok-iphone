@@ -1,0 +1,83 @@
+Command line invocation:
+    /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/xcodebuild -project Svitanok.xcodeproj -scheme Svitanok -destination "platform=iOS Simulator,id=0183276C-C5F7-4A53-B0AF-C3D9117595F6" -derivedDataPath build/test -resultBundlePath build/Night.xcresult -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO "-only-testing:SvitanokUITests/NightProbeTests" test-without-building
+
+Build settings from command line:
+    CODE_SIGNING_ALLOWED = NO
+
+Writing result bundle at path:
+	/Users/runner/work/svitanok-iphone/svitanok-iphone/build/Night.xcresult
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, arch:arm64, id:0183276C-C5F7-4A53-B0AF-C3D9117595F6, OS:26.4.1, name:iPhone 17 Pro }
+{ platform:iOS Simulator, arch:x86_64, id:0183276C-C5F7-4A53-B0AF-C3D9117595F6, OS:26.4.1, name:iPhone 17 Pro }
+2026-10-14 21:16:03.027002+0000 SvitanokUITests-Runner[14583:50785] [Default] Running tests...
+2026-10-14 21:16:03.353968+0000 SvitanokUITests-Runner[14583:52886] [General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-10-14 21:16:03.399286+0000 SvitanokUITests-Runner[14583:52884] [General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+objc[14583]: Class UIAccessibilityLoaderWebShared is implemented in both /Library/Developer/CoreSimulator/Volumes/iOS_23E254a/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.4.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x106914310) and /Library/Developer/CoreSimulator/Volumes/iOS_23E254a/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.4.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x106790398). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-10-14 21:16:05.415.
+Test Suite 'SvitanokUITests.xctest' started at 2026-10-14 21:16:05.415.
+Test Suite 'NightProbeTests' started at 2026-10-14 21:16:05.416.
+Test Case '-[SvitanokUITests.NightProbeTests testControlledAllClearWhileLocked]' started.
+    t =     0.01s Start Test at 2026-10-14 21:16:05.437
+    t =     1.56s Set Up
+    t =     1.57s Open ua.semmyx.svitanok
+    t =     1.57s     Launch ua.semmyx.svitanok
+2026-10-14 21:16:20.202 xcodebuild[13736:47566] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-10-14 21:16:20.202 xcodebuild[13736:47566] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =    23.33s         Setting up automation session
+    t =    26.81s         Wait for ua.semmyx.svitanok to idle
+    t =    29.38s Find the "night-demo" Button
+    t =    31.47s Waiting 10.0s for "night-demo" Button to exist
+    t =    32.49s     Checking `Expect predicate `existsNoRetry == 1` for object "night-demo" Button`
+    t =    32.50s         Checking existence of `"night-demo" Button`
+    t =    32.69s Tap "night-demo" Button
+    t =    32.69s     Wait for ua.semmyx.svitanok to idle
+    t =    32.69s     Find the "night-demo" Button
+    t =    32.75s     Check for interrupting elements affecting "night-demo" Button
+    t =    32.87s     Synthesize event
+    t =    33.39s     Wait for ua.semmyx.svitanok to idle
+    t =    33.41s Checking existence of `Button (First Match)`
+    t =    34.09s Tap Button (First Match)
+    t =    34.09s     Wait for com.apple.springboard to idle
+    t =    34.28s     Find the Button (First Match)
+    t =    34.42s     Check for interrupting elements affecting "Allow" Button
+    t =    35.04s     Synthesize event
+    t =    35.35s     Wait for com.apple.springboard to idle
+    t =    36.66s Checking existence of `Button (First Match)`
+    t =    37.80s Checking existence of `Button (First Match)`
+    t =    38.91s Checking existence of `Button (First Match)`
+    t =    40.03s Checking existence of `Button (First Match)`
+    t =    41.11s Checking existence of `Button (First Match)`
+    t =    42.16s Checking existence of `Button (First Match)`
+    t =    43.23s Checking existence of `Button (First Match)`
+    t =    44.29s Checking existence of `Button (First Match)`
+    t =    45.37s Checking existence of `Button (First Match)`
+    t =    46.43s Checking existence of `Button (First Match)`
+    t =    47.50s Checking existence of `Button (First Match)`
+    t =    48.59s Checking existence of `Button (First Match)`
+    t =    49.80s Checking existence of `Button (First Match)`
+    t =    50.86s Checking existence of `Button (First Match)`
+    t =    51.92s Find the Target Application 'ua.semmyx.svitanok'
+    t =    58.93s Added attachment named '07a-before-lock-night-state'
+    t =    58.93s Pressing Home button
+    t =   215.53s Find the Application 'com.apple.springboard'
+    t =   216.49s Added attachment named '07-controlled-locked-all-clear'
+    t =   216.50s Tear Down
+Test Case '-[SvitanokUITests.NightProbeTests testControlledAllClearWhileLocked]' passed (216.979 seconds).
+Test Suite 'NightProbeTests' passed at 2026-10-14 21:19:42.417.
+	 Executed 1 test, with 0 failures (0 unexpected) in 216.979 (217.001) seconds
+Test Suite 'SvitanokUITests.xctest' passed at 2026-10-14 21:19:42.419.
+	 Executed 1 test, with 0 failures (0 unexpected) in 216.979 (217.004) seconds
+Test Suite 'Selected tests' passed at 2026-10-14 21:19:42.420.
+	 Executed 1 test, with 0 failures (0 unexpected) in 216.979 (217.005) seconds
+2026-10-14 21:19:44.895 xcodebuild[13736:47566] [MT] IDETestOperationsObserverDebug: 274.007 elapsed -- Testing started completed.
+2026-10-14 21:19:44.895 xcodebuild[13736:47566] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-14 21:19:44.895 xcodebuild[13736:47566] [MT] IDETestOperationsObserverDebug: 274.007 sec, +274.007 sec -- end
+
+Test session results, code coverage, and logs:
+	/Users/runner/work/svitanok-iphone/svitanok-iphone/build/Night.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started
