@@ -2,8 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build/logs/night
-brew install facebook/fb/idb-companion > build/logs/night/idb-install.txt 2>&1
-python3 -m venv build/idb-env
+brew install facebook/fb/idb-companion python@3.11 > build/logs/night/idb-install.txt 2>&1
+"$(brew --prefix python@3.11)/bin/python3.11" -m venv build/idb-env
 build/idb-env/bin/pip install 'fb-idb==1.1.7' 'protobuf<4' >> build/logs/night/idb-install.txt 2>&1
 build/idb-env/bin/idb ui button --help > build/logs/night/idb-help.txt
 SIM_ID="$(cat build/logs/test-simulator-id.txt)"

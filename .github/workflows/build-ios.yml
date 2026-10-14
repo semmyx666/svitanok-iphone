@@ -1,6 +1,11 @@
 name: Build iPhone IPA (unsigned)
 "on":
   workflow_dispatch:
+    inputs:
+      probe_only:
+        description: Recheck only locked-screen experiment (unit/UI suite already run)
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -37,7 +42,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/test_ios.sh 2>&1 | tee build/logs/swift-tests.txt
+          PROBE_ONLY="${{ inputs.probe_only }}" bash scripts/test_ios.sh 2>&1 | tee build/logs/swift-tests.txt
       - name: Experimental hardware-LOCK all-clear probe (report separately)
         id: night_probe
         continue-on-error: true

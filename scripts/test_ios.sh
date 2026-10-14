@@ -20,10 +20,12 @@ sys.exit("Установите iOS 26+ Simulator в Xcode Settings → Component
 mkdir -p build/logs
 printf '%s\n' "$SIM_ID" > build/logs/test-simulator-id.txt
 RESULT_PATH="build/Tests-$(date +%Y%m%d-%H%M%S).xcresult"
+ACTION=test
+if [[ "${PROBE_ONLY:-false}" == true ]]; then ACTION=build-for-testing; fi
 xcodebuild -project Svitanok.xcodeproj -scheme Svitanok \
   -destination "platform=iOS Simulator,id=$SIM_ID" \
   -derivedDataPath build/test -resultBundlePath "$RESULT_PATH" \
-  CODE_SIGNING_ALLOWED=NO -skip-testing:SvitanokUITests/NightProbeTests test
+  CODE_SIGNING_ALLOWED=NO -skip-testing:SvitanokUITests/NightProbeTests "$ACTION"
 
 mkdir -p build/logs/ui-screenshots
-xcrun xcresulttool export attachments --path "$RESULT_PATH" --output-path build/logs/ui-screenshots
+if [[ "$ACTION" == test ]]; then xcrun xcresulttool export attachments --path "$RESULT_PATH" --output-path build/logs/ui-screenshots; fi
