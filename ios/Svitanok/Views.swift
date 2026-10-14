@@ -224,7 +224,7 @@ struct SettingsView: View {
                     Picker("Источник", selection: $model.prefs.dataSource) {
                         Text("Без ключа · UA Siren").tag(Optional("public"))
                         Text("Мой сервер · alerts.in.ua").tag(Optional("proxy"))
-                    }
+                    }.accessibilityIdentifier("source-picker")
                     Text("UA Siren — публичный сторонний сервис. Ключ и свой сервер не нужны. Нужен интернет. Данные проверяются примерно каждые 15 секунд только при открытом приложении.")
                         .font(.subheadline).foregroundStyle(Color.muted)
                     if model.prefs.dataSource == "proxy" {

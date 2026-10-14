@@ -41,4 +41,17 @@ final class InterfaceTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Обычный сигнал работает с закрытым экраном"].exists)
         capture("05-settings-iPhone")
     }
+    func testPublicSourceNeedsNoServerField() {
+        app.tabBars.buttons["Настройки"].tap()
+        let picker = app.descendants(matching: .any).matching(identifier: "source-picker").firstMatch
+        for _ in 0..<6 {
+            if picker.exists && picker.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(picker.exists)
+        XCTAssertTrue(picker.isHittable)
+        XCTAssertFalse(app.textFields["HTTPS-адрес сервера"].exists)
+        capture("06-public-source-settings-iPhone")
+    }
+
 }

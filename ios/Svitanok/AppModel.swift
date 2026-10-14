@@ -23,6 +23,7 @@ final class AppModel {
         let calendar = Calendar.current
         selectedDate = calendar.nextDate(after: .now, matching: DateComponents(hour: 6, minute: 30), matchingPolicy: .nextTime) ?? Date.now.addingTimeInterval(3600)
         if !["public", "proxy"].contains(prefs.dataSource ?? "") { prefs.dataSource = "public" }
+        if prefs.dataSource == "public" { networkMessage = "Подключение к UA Siren без API-ключа…" }
         if !Region.all.indices.contains(prefs.region) { prefs.region = 9 }
         if prefs.locationUID != nil && AlertLocation.find(prefs.locationUID) == nil { prefs.locationUID = nil }
         if ![30, 60, 120].contains(prefs.maxDelayMinutes) { prefs.maxDelayMinutes = 60 }
