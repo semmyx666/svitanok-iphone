@@ -1,0 +1,25 @@
+test_preserves_permissions (test_packaging.PackagingTests.test_preserves_permissions) ... ok
+test_rejects_bad_minimum (test_packaging.PackagingTests.test_rejects_bad_minimum) ... ok
+test_rejects_empty_alarm_description (test_packaging.PackagingTests.test_rejects_empty_alarm_description) ... ok
+test_rejects_empty_binary (test_packaging.PackagingTests.test_rejects_empty_binary) ... ok
+test_rejects_infinite_minimum (test_packaging.PackagingTests.test_rejects_infinite_minimum) ... ok
+test_rejects_missing_alarm_description (test_packaging.PackagingTests.test_rejects_missing_alarm_description) ... ok
+test_rejects_missing_binary (test_packaging.PackagingTests.test_rejects_missing_binary) ... ok
+test_rejects_missing_bundle_id (test_packaging.PackagingTests.test_rejects_missing_bundle_id) ... ok
+test_rejects_missing_exec_bit (test_packaging.PackagingTests.test_rejects_missing_exec_bit) ... ok
+test_rejects_missing_minimum (test_packaging.PackagingTests.test_rejects_missing_minimum) ... ok
+test_rejects_missing_platform (test_packaging.PackagingTests.test_rejects_missing_platform) ... ok
+test_rejects_nan_minimum (test_packaging.PackagingTests.test_rejects_nan_minimum) ... ok
+test_rejects_old_os (test_packaging.PackagingTests.test_rejects_old_os) ... ok
+test_rejects_path_traversal (test_packaging.PackagingTests.test_rejects_path_traversal) ... ok
+test_rejects_simulator (test_packaging.PackagingTests.test_rejects_simulator) ... ok
+test_rejects_source_as_executable (test_packaging.PackagingTests.test_rejects_source_as_executable) ... ok
+test_rejects_symlink (test_packaging.PackagingTests.test_rejects_symlink) ... ok
+test_rejects_wrong_architecture (test_packaging.PackagingTests.test_rejects_wrong_architecture) ... ok
+test_resources_included (test_packaging.PackagingTests.test_resources_included) ... ok
+test_structure_and_digest (test_packaging.PackagingTests.test_structure_and_digest) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.057s
+
+OK
