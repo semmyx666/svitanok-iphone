@@ -15,14 +15,13 @@ targets:
     platform: iOS
     sources:
       - path: ios/Svitanok
+        excludes:
+          - Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ua.semmyx.svitanok
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_NSAlarmKitUsageDescription: "Світанок устанавливает выбранный вами будильник и резервный сигнал."
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-        INFOPLIST_KEY_CFBundleDisplayName: "Світанок"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: ios/Svitanok/Info.plist
         MARKETING_VERSION: "0.2.0"
         CURRENT_PROJECT_VERSION: "2"
         CODE_SIGN_STYLE: Automatic

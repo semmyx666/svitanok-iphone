@@ -1,5 +1,6 @@
 """Structural audit, deliberately NOT an iOS compiler or hardware test."""
 import json
+import plistlib
 from pathlib import Path
 import subprocess
 import wave
@@ -7,7 +8,9 @@ import yaml
 root = Path(__file__).resolve().parents[1]
 config = yaml.safe_load((root / "project.yml").read_text())
 assert config["options"]["deploymentTarget"]["iOS"] == "26.0"
-assert config["targets"]["Svitanok"]["settings"]["base"]["INFOPLIST_KEY_NSAlarmKitUsageDescription"].strip()
+assert config["targets"]["Svitanok"]["settings"]["base"]["GENERATE_INFOPLIST_FILE"] is False
+with (root / "ios/Svitanok/Info.plist").open("rb") as f:
+    assert plistlib.load(f)["NSAlarmKitUsageDescription"].strip()
 assert config["schemes"]["Svitanok"]["test"]["targets"] == ["SvitanokTests"]
 for path in root.glob("scripts/*.sh"):
     subprocess.run(["bash", "-n", str(path)], check=True)
