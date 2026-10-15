@@ -295,7 +295,9 @@ final class AppModel {
             // Do not let follow-up preparation turn an already confirmed release into a retry
             // with the same AlarmKit ID. Alerting is also a valid confirmed system state.
             let due=Date.now.addingTimeInterval(5)
-            if !(try service.scheduled(p.releaseID)) && !(try service.alerting(p.releaseID)) {
+            let alreadyScheduled=try service.scheduled(p.releaseID)
+            let alreadyAlerting=try service.alerting(p.releaseID)
+            if !alreadyScheduled && !alreadyAlerting {
                 try await service.schedule(id:p.releaseID,at:due,title:"Світанок · источник сообщает отбой",plan:p)
             }
             guard Persistence.load(Plan.self,key:"plan")?.groupID == p.groupID else { try service.cancel(id:p.releaseID); return }
