@@ -76,12 +76,25 @@ struct HomeView: View {
                             .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 12)
                     }.buttonStyle(.bordered).tint(.sky).disabled(model.busy).accessibilityIdentifier("night-demo")
                     Text("Тест включает тихий шум для сна и искусственные статусы. После «Ночной звук играет» заблокируй экран. Около 2 минут; это не настоящая тревога.").font(.caption).foregroundStyle(Color.peach)
-                    Text("Срабатывает один раз. Для следующего утра поставь новый сигнал.")
+                    Text("Подъём на одну выбранную дату. В режиме «Не проспать»: три сигнала с интервалом 5 минут; после примера можно оставить ещё три или отключить всю серию.")
                         .font(.subheadline).foregroundStyle(Color.muted)
+                    if ProcessInfo.processInfo.arguments.contains("--wake-probe") {
+                        Button("CI · серия и математика") { Task { await model.arm(wakeProbe:true) } }.accessibilityIdentifier("wake-probe")
+                    }
                 } else {
+                    if !model.wakeSummary.isEmpty {
+                        VStack(alignment:.leading,spacing:12) {
+                            Label("НЕ ПРОСПАТЬ",systemImage:"brain.head.profile").font(.caption.bold()).foregroundStyle(Color.sky)
+                            Text(model.wakeSummary).font(.headline).fixedSize(horizontal:false,vertical:true).accessibilityIdentifier("wake-series-summary")
+                            Text("Пример → ещё 3 сигнала. Уже встал → реши пример и отключи всю серию.").font(.subheadline).foregroundStyle(Color.muted)
+                        }.padding(20).frame(maxWidth:.infinity,alignment:.leading).background(Color.panel,in:RoundedRectangle(cornerRadius:20))
+                    }
+                    if model.plan?.wakeProbe == true {
+                        Button("CI · обработчик системной остановки") { Task { await model.probeSystemStop() } }.accessibilityIdentifier("probe-system-stop")
+                    }
                     Button(role: .destructive) { model.disarm() } label: {
-                        Text("Отключить будильник и резерв").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 12)
-                    }.buttonStyle(.bordered).disabled(model.busy)
+                        Text(model.plan?.wakeProtection == true ? "Я встал · отключить серию через пример" : "Отключить будильник и резерв").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 12)
+                    }.buttonStyle(.bordered).disabled(model.busy).accessibilityIdentifier("cancel-series")
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     Label(model.statusText, systemImage: statusIcon).font(.headline).foregroundStyle(statusColor)
@@ -100,7 +113,7 @@ struct HomeView: View {
                     }
                 }.padding(18).background(Color.peach.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
                 if !model.message.isEmpty { Text(model.message).font(.subheadline).foregroundStyle(Color.muted) }
-                Label("Версия 0.5 · не заменяет оповещения о тревоге", systemImage: "exclamationmark.shield")
+                Label("Версия 0.6 · не заменяет оповещения о тревоге", systemImage: "exclamationmark.shield")
                     .font(.subheadline).foregroundStyle(Color.peach)
             }.padding(20)
         }.background(Color.night)
@@ -220,12 +233,19 @@ struct SettingsView: View {
                             .font(.subheadline).foregroundStyle(Color.muted)
                     }
                 }
+                Section("Не проспать") {
+                    Toggle("Пример и три сигнала",isOn:Binding(get:{model.prefs.wakeProtection != false},set:{model.prefs.wakeProtection=$0;model.savePreferences()}))
+                    Picker("Интервал повторов",selection:Binding(get:{model.prefs.repeatSeconds ?? 300},set:{model.prefs.repeatSeconds=$0;model.savePreferences()})) {
+                        Text("5 минут").tag(300);Text("10 минут").tag(600);Text("15 минут").tag(900)
+                    }
+                    Text("По умолчанию: 06:30, 06:35, 06:40. Верный пример может поставить ещё 3 сигнала через 5, 10 и 15 минут. Только действие «Я встал» с верным ответом отменяет всю серию. Системная кнопка Stop может остановить текущий звук; это не математическая блокировка iOS.").font(.subheadline).foregroundStyle(Color.muted).fixedSize(horizontal:false,vertical:true)
+                }
                 Section("Звук") {
                     Picker("Мелодия", selection: $model.prefs.sound) {
-                        Text("Системная").tag("system"); Text("Рассвет").tag("dawn"); Text("Импульс").tag("pulse")
+                        Text("Настойчивый · 28 секунд").tag("wake"); Text("Системная").tag("system"); Text("Рассвет").tag("dawn"); Text("Импульс").tag("pulse")
                     }
                     Button("Послушать выбранный звук") { model.previewSound() }
-                    Text("Громкость меняется средствами iPhone. Перед первым использованием проверь сигнал кнопкой «через 2 минуты» и заблокируй экран.")
+                    Text("В окне примера настойчивый звук зациклен до правильного ответа. Длительность системного звонка ограничивает iOS; повторы установлены отдельно. Громкость меняется средствами iPhone. Перед первым использованием проверь сигнал кнопкой «через 2 минуты» и заблокируй экран.")
                         .font(.subheadline).foregroundStyle(Color.muted)
                 }
                 Section("Откуда брать данные тревог") {
@@ -249,7 +269,7 @@ struct SettingsView: View {
                 Section("Важно знать") {
                     Text("Настройки относятся к следующему сигналу. Текущий отключи и установи заново, чтобы применить изменения.")
                     Text("Это не приложение гражданской защиты. «Нет тревоги» не подтверждает безопасность. Не отключай официальные оповещения и резерв в «Часах».")
-                    Text("Версия 0.5: проверяется в симуляторе. Короткий тест симулятора не заменяет ночное испытание на реальном iPhone.")
+                    Text("Версия 0.6: проверяется в симуляторе. Короткий тест симулятора не заменяет ночное испытание на реальном iPhone.")
                 }
             }.scrollContentBackground(.hidden).background(Color.night).navigationTitle("Настройки")
                 .sheet(isPresented: $choosingLocation) { LocationPicker(model: model) }

@@ -64,6 +64,12 @@ struct Plan: Codable, Sendable {
     var dataSource: String? = nil
     var experimental: Bool
     var nightMode: Bool? = nil
+    var wakeProtection: Bool? = nil
+    var wakePhase: Bool? = nil
+    var wakeSlots: [WakeSlot]? = nil
+    var extraWakeIDs: [UUID]? = nil
+    var repeatSeconds: Int? = nil
+    var wakeProbe: Bool? = nil
     var sleepAudio: Bool? = nil
     var demoStart: Date? = nil
     var leaseIDs: [UUID]? = nil
@@ -73,7 +79,7 @@ struct Plan: Codable, Sendable {
     var deferred = false
     var released = false
     var deadline: Date { target.addingTimeInterval(Double(maxDelayMinutes) * 60) }
-    var ids: [UUID] { [primaryID, backupID, releaseID] + (leaseIDs ?? []) }
+    var ids: [UUID] { [primaryID, backupID, releaseID] + (leaseIDs ?? []) + (wakeSlots ?? []).map(\.id) + (extraWakeIDs ?? []) }
 }
 
 /// Pure policy. Any unknown status preserves the system alarm.
@@ -98,6 +104,8 @@ struct Preferences: Codable, Sendable {
     var locationUID: Int? = nil
     var dataSource: String? = nil
     var experimental = false
+    var wakeProtection: Bool? = nil
+    var repeatSeconds: Int? = nil
     var sleepAudio: Bool? = nil
     var maxDelayMinutes = 60
     var sound = "system"
@@ -128,7 +136,7 @@ enum ClockText {
 enum NightDecision: Equatable { case keep, extendLease, release }
 enum NightPolicy {
     static func decide(plan: Plan, status: AlertStatus, now: Date, running: Bool, verified: Bool) -> NightDecision {
-        guard plan.nightMode == true, plan.experimental, running, !plan.released, now < plan.deadline else { return .keep }
+        guard plan.nightMode == true, plan.experimental, plan.wakePhase != true, running, !plan.released, now < plan.deadline else { return .keep }
         if plan.deferred && status == .clear && now >= plan.target { return .release }
         guard verified, status == .active || status == .partial else { return .keep }
         let due = plan.deferred ? plan.currentLeaseDue : plan.target

@@ -11,6 +11,7 @@ struct SvitanokApp: App {
                 MapView().tabItem { Label("Карта", systemImage: "map") }
                 SettingsView(model: model).tabItem { Label("Настройки", systemImage: "slider.horizontal.3") }
             }.tint(.sky).preferredColorScheme(.dark)
+                .sheet(item:$model.challenge) { request in WakeChallengeView(model:model,request:request) }
                 .onChange(of: phase, initial: true) { _, phase in
                     model.updateForeground(phase == .active)
                 }

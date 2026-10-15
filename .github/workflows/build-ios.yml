@@ -51,6 +51,9 @@ jobs:
       - name: Record experiment outcome
         if: always()
         run: echo "Locked-screen experiment = ${{ steps.night_probe.outcome }}; not an overnight hardware guarantee" > build/logs/night-outcome.txt
+      - name: Math and repeat alarms with actual Simulator LOCK
+        shell: bash
+        run: bash scripts/test_wake.sh
       - name: Build arm64 iPhone app and package unsigned IPA
         shell: bash
         run: |

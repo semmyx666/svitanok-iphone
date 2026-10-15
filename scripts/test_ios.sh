@@ -25,7 +25,7 @@ if [[ "${PROBE_ONLY:-false}" == true ]]; then ACTION=build-for-testing; fi
 xcodebuild -project Svitanok.xcodeproj -scheme Svitanok \
   -destination "platform=iOS Simulator,id=$SIM_ID" \
   -derivedDataPath build/test -resultBundlePath "$RESULT_PATH" \
-  CODE_SIGNING_ALLOWED=NO -skip-testing:SvitanokUITests/NightProbeTests "$ACTION"
+  CODE_SIGNING_ALLOWED=NO -skip-testing:SvitanokUITests/NightProbeTests -skip-testing:SvitanokUITests/WakeProbeTests "$ACTION"
 
 mkdir -p build/logs/ui-screenshots
 if [[ "$ACTION" == test ]]; then xcrun xcresulttool export attachments --path "$RESULT_PATH" --output-path build/logs/ui-screenshots; fi

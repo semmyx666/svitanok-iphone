@@ -11,6 +11,10 @@ final class AppModel {
     var snapshot: Snapshot?
     var message = "Установите будильник и проверьте его коротким тестом."
     var networkMessage = "Сервер ещё не подключён"
+    var challenge: WakeChallenge?
+    var challengeError = ""
+    var ringingInApp = false
+    private var ringPlayer: AVAudioPlayer?
     var busy = false
     var setupVerified = false
     var isForeground = false
@@ -31,7 +35,9 @@ final class AppModel {
         if !Region.all.indices.contains(prefs.region) { prefs.region = 9 }
         if prefs.locationUID != nil && AlertLocation.find(prefs.locationUID) == nil { prefs.locationUID = nil }
         if ![30, 60, 120].contains(prefs.maxDelayMinutes) { prefs.maxDelayMinutes = 60 }
-        if !["system", "dawn", "pulse"].contains(prefs.sound) { prefs.sound = "system" }
+        if !["system", "dawn", "pulse", "wake"].contains(prefs.sound) { prefs.sound = "system" }
+        if prefs.wakeProtection == nil { prefs.wakeProtection = true }
+        if ![300,600,900].contains(prefs.repeatSeconds ?? 0) { prefs.repeatSeconds = 300 }
         if prefs.sleepAudio == nil { prefs.sleepAudio = true }
         night.connect(self)
     }
@@ -57,6 +63,7 @@ final class AppModel {
     func savePreferences() { Persistence.save(prefs, key: "preferences") }
     func updateForeground(_ active: Bool) {
         isForeground = active
+        if let p=plan, p.wakeProbe == true && !active { WakeProbeLog.write("app.background",plan:p) }
         if active { reconcile() }
     }
     func reconcile() {
@@ -65,8 +72,17 @@ final class AppModel {
         guard let p = plan else { setupVerified = false; return }
         do {
             let ids = try service.ids()
-            let primaryPresent = p.deferred ? ids.contains(p.backupID) || ids.contains(p.releaseID) : ids.contains(p.primaryID)
-            setupVerified = primaryPresent && (!p.experimental || ids.contains(p.backupID))
+            let primaryPresent = p.wakePhase == true ? (p.wakeSlots ?? []).contains { ids.contains($0.id) } : (p.deferred ? ids.contains(p.backupID) || ids.contains(p.releaseID) : ids.contains(p.primaryID))
+            setupVerified = primaryPresent && (p.wakePhase == true || !p.experimental || ids.contains(p.backupID))
+            if p.wakeProtection == true && challenge == nil && isForeground && !busy {
+                let requested = UserDefaults.standard.string(forKey:"wake-request-group") == p.groupID.uuidString
+                let alerting=try service.anyAlerting(p)
+                if requested || alerting {
+                    UserDefaults.standard.removeObject(forKey:"wake-request-group")
+                    if (try? service.anyAlerting(p)) == true { WakeProbeLog.write(p.wakePhase == true ? "repeat.alerting":"first.alerting",plan:p) }
+                    requestChallenge(repeatLater:true)
+                }
+            }
             if p.ids.allSatisfy({ !ids.contains($0) }) {
                 plan = nil
                 UserDefaults.standard.removeObject(forKey: "plan")
@@ -74,7 +90,7 @@ final class AppModel {
             }
         } catch { setupVerified = false; message = "Не удалось проверить системные сигналы: \(error.localizedDescription)" }
     }
-    func arm(test: Bool = false, nightDemo: Bool = false) async {
+    func arm(test: Bool = false, nightDemo: Bool = false, wakeProbe: Bool = false) async {
         guard !busy else { return }
         busy = true; defer { busy = false }
         do {
@@ -82,25 +98,37 @@ final class AppModel {
                 message = "Сначала отключите текущий будильник. Изменения настроек не меняют уже установленный сигнал."
                 return
             }
-            let target = nightDemo ? Date.now.addingTimeInterval(90) : (test ? Date.now.addingTimeInterval(120) : selectedDate)
+            let isWakeProbe = wakeProbe && ProcessInfo.processInfo.arguments.contains("--wake-probe")
+            let target = isWakeProbe ? Date.now.addingTimeInterval(70) : (nightDemo ? Date.now.addingTimeInterval(90) : (test ? Date.now.addingTimeInterval(120) : selectedDate))
             guard target.timeIntervalSinceNow >= 60 else { message = "Выберите время минимум через минуту."; return }
             if prefs.experimental && !test && !nightDemo { _ = try endpoint() }
             if prefs.experimental && target.timeIntervalSinceNow > 12 * 3600 { message = "Ночной режим: время не дальше 12 часов. Для другого дня используйте обычный сигнал."; return }
             try await service.authorize()
             var p = Plan(target: target, maxDelayMinutes: nightDemo ? 5 : prefs.maxDelayMinutes, region: prefs.region,
-                         experimental: nightDemo || (!test && prefs.experimental), sound: prefs.sound)
+                         experimental: nightDemo || (!test && !isWakeProbe && prefs.experimental), sound: prefs.sound)
             p.nightMode = p.experimental
+            p.wakeProtection = prefs.wakeProtection != false
+            p.repeatSeconds = isWakeProbe ? 15 : (prefs.repeatSeconds ?? 300)
+            p.wakeProbe = isWakeProbe
             p.sleepAudio = p.experimental && (nightDemo || prefs.sleepAudio == true)
             if nightDemo { p.demoStart = .now }
             p.locationUID = prefs.locationUID ?? (prefs.dataSource == "public" ? PublicCatalog.oblastUID(for: prefs.region) : nil)
             p.dataSource = nightDemo ? "public" : prefs.dataSource
             if nightDemo { p.locationUID = prefs.locationUID ?? PublicCatalog.oblastUID(for:prefs.region) }
+            guard WakeSerial.acquire(p.groupID) else { return }
+            defer { WakeSerial.release(p.groupID) }
             // Persist intent identity before any schedule, including partial-failure states.
             Persistence.save(p, key: "plan"); plan = p; setupVerified = false
             do {
                 // Backup first. The primary is NEVER canceled without a verified backup.
                 if p.experimental { try await service.schedule(id: p.backupID, at: p.deadline, title: "Світанок · предельное время", plan: p) }
                 try await service.schedule(id: p.primaryID, at: p.target, title: "Світанок · пора вставать", plan: p)
+                if p.wakeProtection == true {
+                    let base=p.target
+                    let slots=try await WakeSeries.prepare(&p,base:base,count:2)
+                    try WakeSeries.commit(&p,slots:slots)
+                    plan=p
+                }
                 guard Persistence.load(Plan.self, key: "plan")?.groupID == p.groupID else {
                     try service.cancel(plan: p)
                     plan = nil; setupVerified = false
@@ -110,9 +138,11 @@ final class AppModel {
                 let ids = try service.ids()
                 guard ids.contains(p.primaryID), !p.experimental || ids.contains(p.backupID) else { throw WakeError.noBackup }
                 setupVerified = true
+                WakeProbeLog.write("armed",plan:p,extra:["series_count":p.wakeProtection == true ? 3:1])
                 if p.nightMode == true { night.begin(p, useSleepAudio: p.sleepAudio == true) }
                 message = nightDemo ? "ТЕСТ: искусственная тревога до 2-й минуты, затем искусственный отбой. Это не настоящие данные." : (test ? "Тестовый системный сигнал — через 2 минуты. Заблокируйте экран." : "Системный сигнал установлен. Один раз, в выбранную дату.")
             } catch {
+                plan=Persistence.load(Plan.self,key:"plan")
                 // Keep any successfully scheduled backup; UI explicitly reports incomplete setup.
                 message = "Установка неполная: \(error.localizedDescription). Проверьте/отключите оставшиеся сигналы."
                 return
@@ -121,7 +151,8 @@ final class AppModel {
     }
     func disarm() {
         guard !busy else { return }
-        guard let p = plan else { return }
+        guard let p = Persistence.load(Plan.self,key:"plan") else { return }
+        if p.wakeProtection == true { requestChallenge(repeatLater:false); return }
         do {
             try service.cancel(plan: p)
             night.finish(success:true,reason:"Будильник отключён")
@@ -194,6 +225,8 @@ final class AppModel {
     }
     private func evaluate() async {
         guard !busy, executionAllowed, var p = plan else { return }
+        guard WakeSerial.acquire(p.groupID) else { return }
+        defer { WakeSerial.release(p.groupID) }
         busy = true; defer { busy = false }
         do {
             let ids = try service.ids()
@@ -227,7 +260,7 @@ final class AppModel {
                 plan = p; Persistence.save(p, key: "plan")
                 message = "Сигнал после отбоя установлен через 5 секунд. «Я проснулся» отключит резерв."
             }
-        } catch { message = "Перенос не завершён: \(error.localizedDescription). Системные сигналы не отключены массово." }
+        } catch { plan=Persistence.load(Plan.self,key:"plan"); message = "Перенос не завершён: \(error.localizedDescription). Системные сигналы не отключены массово." }
     }
     func releaseAlerting(_ p: Plan) -> Bool { (try? service.alerting(p.releaseID)) == true }
     private func evaluateNight(_ p: inout Plan, status: AlertStatus) async throws {
@@ -247,15 +280,25 @@ final class AppModel {
             guard night.active, try service.scheduled(id), try service.scheduled(p.backupID), oldDue.timeIntervalSinceNow > 3 else {
                 try service.cancel(id:id); return
             }
+            if p.wakeProtection == true {
+                let slots=try await WakeSeries.prepare(&p,base:due,count:2)
+                guard night.active, oldDue.timeIntervalSinceNow > 3 else { return }
+                try WakeSeries.commit(&p,slots:slots)
+            }
             p.currentLeaseID = id; p.currentLeaseDue = due; p.deferred = true
             Persistence.save(p,key:"plan"); plan = p
             try service.cancel(id:oldID)
             night.log("lease.extended",extra:["due":due.timeIntervalSince1970])
             message = "Тревога: сигнал отложен. Если проверки оборвутся, последний резерв прозвучит примерно в течение минуты."
         case .release:
-            try await service.schedule(id:p.releaseID,at:.now.addingTimeInterval(5),title:"Світанок · источник сообщает отбой",plan:p)
+            let due=Date.now.addingTimeInterval(5)
+            try await service.schedule(id:p.releaseID,at:due,title:"Світанок · источник сообщает отбой",plan:p)
             guard Persistence.load(Plan.self,key:"plan")?.groupID == p.groupID else { try service.cancel(id:p.releaseID); return }
             guard try service.scheduled(p.releaseID) else { throw WakeError.invalidResponse }
+            if p.wakeProtection == true {
+                let slots=try await WakeSeries.prepare(&p,base:due,count:2)
+                try WakeSeries.commit(&p,slots:slots)
+            }
             p.released = true; Persistence.save(p,key:"plan"); plan = p
             // A confirmed release alarm exists before removing the short lease.
             if let id=p.currentLeaseID, try service.scheduled(id) { try service.cancel(id:id) }
@@ -263,6 +306,78 @@ final class AppModel {
             message = "Источник сообщил отбой. Системный сигнал установлен через 5 секунд."
         }
     }
+    func probeSystemStop() async {
+        guard !busy,ProcessInfo.processInfo.arguments.contains("--wake-probe"),let p=plan,p.wakeProbe==true else {return}
+        busy=true;defer{busy=false}
+        do {
+            _ = try await WakeStopIntent(groupID:p.groupID.uuidString).perform()
+            UserDefaults.standard.removeObject(forKey:"wake-request-group")
+            busy=false;reconcile()
+        } catch { message="Тест обработчика остановки не выполнен." }
+    }
+    var wakeSummary:String {
+        guard let p=plan,p.wakeProtection==true else { return "" }
+        let names=(p.wakeSlots ?? []).map { ClockText.format($0.due) }.joined(separator:" · ")
+        return p.wakePhase==true ? "Ещё 3 сигнала: \(names)" : "3 сигнала: \(ClockText.format(p.target)) · \(names)"
+    }
+    func requestChallenge(repeatLater:Bool) {
+        guard !busy,challenge==nil,let p=Persistence.load(Plan.self,key:"plan"),p.wakeProtection==true else { return }
+        let question=p.wakeProbe==true ? MathQuestion(left:108,right:63):MathQuestion.random()
+        challengeError="";challenge=WakeChallenge(groupID:p.groupID,question:question,repeatLater:repeatLater)
+        if repeatLater || (try? service.anyAlerting(p))==true {
+            night.finish(success:true,reason:"Пробуждение: реши пример")
+            startWakeRinging()
+        }
+    }
+    func submitChallenge(_ answer:String,finishAll:Bool) async {
+        guard !busy,let request=challenge,let loaded=Persistence.load(Plan.self,key:"plan"),loaded.groupID==request.groupID else { return }
+        guard request.question.accepts(answer) else {
+            challengeError="Пока неверно. Попробуй ещё раз — сигналы не отключены."
+            WakeProbeLog.write("math.rejected",plan:loaded);return
+        }
+        guard WakeSerial.acquire(loaded.groupID) else { challengeError="Подожди, система обновляет сигналы.";return }
+        defer{WakeSerial.release(loaded.groupID)}
+        busy=true;defer{busy=false}
+        var p=loaded
+        do {
+            if finishAll {
+                try service.cancel(plan:p)
+                guard try service.ids().isDisjoint(with:Set(p.ids)) else { throw WakeError.noBackup }
+                WakeProbeLog.write("math.finish",plan:p,extra:["remaining_system_ids":0])
+                UserDefaults.standard.removeObject(forKey:"plan");plan=nil;setupVerified=false
+                message="Пример решён. Вся серия и резерв отключены. Доброе утро!"
+            } else {
+                let oldIDs=Set(p.ids)
+                let slots=try await WakeSeries.prepare(&p,base:.now,count:3)
+                p.wakeSlots=slots;p.wakePhase=true
+                Persistence.save(p,key:"plan");plan=p
+                try service.cancelIDs(oldIDs.subtracting(Set(slots.map(\.id))))
+                setupVerified=true
+                WakeProbeLog.write("math.repeat",plan:p,extra:["verified_followups":3])
+                message="Пример решён. Ещё 3 сигнала через \(Int(RepeatPolicy.interval(p)/60)), \(Int(RepeatPolicy.interval(p)*2/60)) и \(Int(RepeatPolicy.interval(p)*3/60)) минут. Уже встал — отключи всю серию новым примером."
+            }
+            night.finish(success:true,reason:"Математическое подтверждение получено")
+            stopWakeRinging();challenge=nil;challengeError=""
+            UserDefaults.standard.removeObject(forKey:"wake-request-group")
+        } catch {
+            plan=Persistence.load(Plan.self,key:"plan")
+            challengeError="Не удалось завершить действие. Оставшиеся сигналы сохранены: \(error.localizedDescription)"
+        }
+    }
+    private func startWakeRinging() {
+        guard !ringingInApp,let url=Bundle.main.url(forResource:"wake",withExtension:"wav") else{return}
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback,mode:.default,options:[.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true)
+            let p=try AVAudioPlayer(contentsOf:url);p.numberOfLoops = -1;p.volume=1;p.prepareToPlay()
+            guard p.play() else{throw WakeError.invalidResponse};ringPlayer=p;ringingInApp=true
+        } catch { challengeError="Звук приложения не запущен. Не отключай системные сигналы." }
+    }
+    private func stopWakeRinging() {
+        ringPlayer?.stop();ringPlayer=nil;ringingInApp=false
+        if !night.active { try? AVAudioSession.sharedInstance().setActive(false,options:.notifyOthersOnDeactivation) }
+    }
+
     func previewSound() {
         guard prefs.sound != "system", let url = Bundle.main.url(forResource: prefs.sound, withExtension: "wav") else {
             message = "Системный звук проверяется кнопкой «Тест через 2 минуты»."; return

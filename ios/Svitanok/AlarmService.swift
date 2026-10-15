@@ -39,9 +39,11 @@ final class AlarmService {
     }
     func scheduled(_ id: UUID) throws -> Bool { try manager.alarms.contains { $0.id == id && $0.state == .scheduled } }
     func alerting(_ id: UUID) throws -> Bool { try manager.alarms.contains { $0.id == id && $0.state == .alerting } }
+    func anyAlerting(_ plan:Plan) throws -> Bool { try manager.alarms.contains { plan.ids.contains($0.id) && $0.state == .alerting } }
     func schedule(id: UUID, at date: Date, title: String, plan: Plan) async throws {
         let stop = AlarmButton(text: "Я проснулся", textColor: .white, systemImageName: "checkmark")
-        let presentation = AlarmPresentation(alert: .init(title: LocalizedStringResource(stringLiteral: title), stopButton: stop))
+        let extra: AlarmButton? = plan.wakeProtection == true ? AlarmButton(text: "Решить пример", textColor: .white, systemImageName: "brain.head.profile") : nil
+        let presentation = AlarmPresentation(alert: .init(title: LocalizedStringResource(stringLiteral: title), stopButton: stop, secondaryButton: extra, secondaryButtonBehavior: extra == nil ? nil : .custom))
         let attributes = AlarmAttributes(presentation: presentation,
                                          metadata: WakeMetadata(groupID: plan.groupID.uuidString),
                                          tintColor: Color(red: 0.42, green: 0.76, blue: 0.92))
@@ -49,13 +51,15 @@ final class AlarmService {
         let sound: AlertConfiguration.AlertSound = plan.sound == "system" ? .default : .named(plan.sound + ".wav")
         let configuration = AlarmManager.AlarmConfiguration<WakeMetadata>(
             schedule: .fixed(date), attributes: attributes,
-            stopIntent: WakeStopIntent(groupID: plan.groupID.uuidString), sound: sound)
+            stopIntent: WakeStopIntent(groupID: plan.groupID.uuidString),
+            secondaryIntent: plan.wakeProtection == true ? WakeOpenIntent(groupID: plan.groupID.uuidString) : nil, sound: sound)
         _ = try await manager.schedule(id: id, configuration: configuration)
     }
     func cancel(id: UUID) throws { try manager.cancel(id: id) }
-    func cancel(plan: Plan) throws {
+    func cancel(plan: Plan) throws { try cancelIDs(Set(plan.ids)) }
+    func cancelIDs(_ targetIDs: Set<UUID>) throws {
         let current = try manager.alarms
-        for alarm in current where plan.ids.contains(alarm.id) {
+        for alarm in current where targetIDs.contains(alarm.id) {
             if alarm.state == .alerting {
                 try manager.stop(id: alarm.id)
                 // A one-time stop usually removes the occurrence. Cancel only if still present.
@@ -76,6 +80,10 @@ struct WakeStopIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         // Resolve persisted IDs, not all alarms: other users' apps are untouched.
         let expectedGroup = groupID
+        if await MainActor.run(body: { Persistence.load(Plan.self,key:"plan")?.wakeProtection == true }) {
+            try await WakeSeries.systemStopped(groupID:expectedGroup)
+            return .result()
+        }
         try await MainActor.run {
             if let plan = Persistence.load(Plan.self, key: "plan"), plan.groupID.uuidString == expectedGroup {
                 try AlarmService().cancel(plan: plan)

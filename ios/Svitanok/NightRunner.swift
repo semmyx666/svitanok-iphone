@@ -59,6 +59,7 @@ final class NightRunner {
             guard let self, let owner else { return }
             while !Task.isCancelled && self.running {
                 guard let p=Persistence.load(Plan.self,key:"plan"),p.groupID==self.group else { self.finish(success:true,reason:"Будильник остановлен");return }
+                if p.wakePhase == true { self.finish(success:true,reason:"Пробуждение: серия и математический пример");return }
                 if Date.now>=p.deadline { self.finish(success:true,reason:"Достигнуто предельное время");return }
                 if p.released {
                     if owner.releaseAlerting(p) { self.log("release.alerting");self.finish(success:true,reason:"Система сообщает: сигнал после отбоя активен");return }
