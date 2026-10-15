@@ -260,11 +260,12 @@ final class AppModel {
                 plan = p; Persistence.save(p, key: "plan")
                 message = "Сигнал после отбоя установлен через 5 секунд. «Я проснулся» отключит резерв."
             }
-        } catch { plan=Persistence.load(Plan.self,key:"plan"); message = "Перенос не завершён: \(error.localizedDescription). Системные сигналы не отключены массово." }
+        } catch { night.log("mutation.failed",extra:["error":error.localizedDescription,"domain":(error as NSError).domain,"code":(error as NSError).code]); plan=Persistence.load(Plan.self,key:"plan"); message = "Перенос не завершён: \(error.localizedDescription). Системные сигналы не отключены массово." }
     }
     func releaseAlerting(_ p: Plan) -> Bool { (try? service.alerting(p.releaseID)) == true }
     private func evaluateNight(_ p: inout Plan, status: AlertStatus) async throws {
         let action = NightPolicy.decide(plan:p,status:status,now:.now,running:night.active,verified:try service.leaseVerified(p))
+        night.log("decision",extra:["status":status.rawValue,"action":String(describing:action),"deferred":p.deferred,"released":p.released,"wake_phase":p.wakePhase==true])
         switch action {
         case .keep: return
         case .extendLease:
@@ -291,19 +292,31 @@ final class AppModel {
             night.log("lease.extended",extra:["due":due.timeIntervalSince1970])
             message = "Тревога: сигнал отложен. Если проверки оборвутся, последний резерв прозвучит примерно в течение минуты."
         case .release:
+            // Do not let follow-up preparation turn an already confirmed release into a retry
+            // with the same AlarmKit ID. Alerting is also a valid confirmed system state.
             let due=Date.now.addingTimeInterval(5)
-            try await service.schedule(id:p.releaseID,at:due,title:"Світанок · источник сообщает отбой",plan:p)
-            guard Persistence.load(Plan.self,key:"plan")?.groupID == p.groupID else { try service.cancel(id:p.releaseID); return }
-            guard try service.scheduled(p.releaseID) else { throw WakeError.invalidResponse }
-            if p.wakeProtection == true {
-                let slots=try await WakeSeries.prepare(&p,base:due,count:2)
-                try WakeSeries.commit(&p,slots:slots)
+            if !(try service.scheduled(p.releaseID)) && !(try service.alerting(p.releaseID)) {
+                try await service.schedule(id:p.releaseID,at:due,title:"Світанок · источник сообщает отбой",plan:p)
             }
-            p.released = true; Persistence.save(p,key:"plan"); plan = p
-            // A confirmed release alarm exists before removing the short lease.
-            if let id=p.currentLeaseID, try service.scheduled(id) { try service.cancel(id:id) }
+            guard Persistence.load(Plan.self,key:"plan")?.groupID == p.groupID else { try service.cancel(id:p.releaseID); return }
+            let releaseScheduled=try service.scheduled(p.releaseID)
+            let releaseAlerting=try service.alerting(p.releaseID)
+            guard releaseScheduled || releaseAlerting else { throw WakeError.invalidResponse }
+            p.released=true;Persistence.save(p,key:"plan");plan=p
             night.log("release.scheduled")
-            message = "Источник сообщил отбой. Системный сигнал установлен через 5 секунд."
+            if let id=p.currentLeaseID, try service.scheduled(id) { try service.cancel(id:id) }
+            if p.wakeProtection == true {
+                do {
+                    let slots=try await WakeSeries.prepare(&p,base:due,count:2)
+                    try WakeSeries.commit(&p,slots:slots)
+                    plan=p
+                } catch {
+                    plan=Persistence.load(Plan.self,key:"plan")
+                    night.log("release.followups_not_moved",extra:["error":error.localizedDescription])
+                    // The confirmed release and old independent follow-ups remain.
+                }
+            }
+            message = "Источник сообщил отбой. Системный сигнал подтверждён; серия повторов сохранена."
         }
     }
     func probeSystemStop() async {

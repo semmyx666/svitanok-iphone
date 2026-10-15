@@ -45,7 +45,6 @@ jobs:
           PROBE_ONLY="${{ inputs.probe_only }}" bash scripts/test_ios.sh 2>&1 | tee build/logs/swift-tests.txt
       - name: Experimental hardware-LOCK all-clear probe (report separately)
         id: night_probe
-        continue-on-error: true
         shell: bash
         run: bash scripts/test_night.sh
       - name: Record experiment outcome
