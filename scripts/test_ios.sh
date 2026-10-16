@@ -20,12 +20,26 @@ sys.exit("Установите iOS 26+ Simulator в Xcode Settings → Component
 mkdir -p build/logs
 printf '%s\n' "$SIM_ID" > build/logs/test-simulator-id.txt
 RESULT_PATH="build/Tests-$(date +%Y%m%d-%H%M%S).xcresult"
-ACTION=test
-if [[ "${PROBE_ONLY:-false}" == true ]]; then ACTION=build-for-testing; fi
+# Let Xcode distinguish simulated iOS entitlements (Mach-O section) from
+# host macOS code-signing entitlements. No paid identity/certificate is used.
+# These settings are limited to this simulator destination; device IPA is unsigned.
 xcodebuild -project Svitanok.xcodeproj -scheme Svitanok \
   -destination "platform=iOS Simulator,id=$SIM_ID" \
+  -derivedDataPath build/test -resultBundlePath "${RESULT_PATH%.xcresult}-build.xcresult" \
+  CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual build-for-testing
+SIM_APP="build/test/Build/Products/Debug-iphonesimulator/Svitanok.app"
+test -d "$SIM_APP"
+codesign -d --entitlements :- "$SIM_APP" > build/logs/simulator-entitlements.plist 2>/dev/null
+# Keep the simulated entitlement section as diagnostic evidence.
+xcrun otool -s __TEXT __entitlements "$SIM_APP/Svitanok" > build/logs/simulator-embedded-entitlements.txt
+if [[ "${PROBE_ONLY:-false}" == true ]]; then exit 0; fi
+set +e
+xcodebuild -project Svitanok.xcodeproj -scheme Svitanok \
+  -destination "platform=iOS Simulator,id=$SIM_ID" -parallel-testing-enabled NO \
   -derivedDataPath build/test -resultBundlePath "$RESULT_PATH" \
-  CODE_SIGNING_ALLOWED=NO -skip-testing:SvitanokUITests/NightProbeTests -skip-testing:SvitanokUITests/WakeProbeTests "$ACTION"
-
+  CODE_SIGNING_ALLOWED=NO -skip-testing:SvitanokUITests/NightProbeTests -skip-testing:SvitanokUITests/WakeProbeTests test-without-building
+TEST_RESULT=$?
+set -e
 mkdir -p build/logs/ui-screenshots
-if [[ "$ACTION" == test ]]; then xcrun xcresulttool export attachments --path "$RESULT_PATH" --output-path build/logs/ui-screenshots; fi
+xcrun xcresulttool export attachments --path "$RESULT_PATH" --output-path build/logs/ui-screenshots || true
+exit "$TEST_RESULT"

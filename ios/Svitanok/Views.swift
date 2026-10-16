@@ -204,9 +204,37 @@ struct LocationPicker: View {
 struct SettingsView: View {
     @Bindable var model: AppModel
     @State private var choosingLocation = false
+    @State private var tokenDraft = ""
+    @FocusState private var tokenFocused: Bool
     var body: some View {
         NavigationStack {
             Form {
+                Section("API-токен alerts.in.ua") {
+                    Text("Вставь ключ из письма alerts.in.ua. Свой сервер не нужен: приложение обращается к API напрямую с твоим личным токеном.")
+                        .font(.subheadline).foregroundStyle(Color.muted)
+                    SecureField("Вставить API-токен", text: $tokenDraft)
+                        .focused($tokenFocused)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .accessibilityIdentifier("alerts-api-token")
+                    Button("Сохранить токен") {
+                        tokenFocused = false
+                        model.saveAPIToken(tokenDraft)
+                        tokenDraft = ""
+                    }.disabled(tokenDraft.isEmpty).accessibilityIdentifier("save-api-token")
+                    Label(model.hasAPIToken ? "Токен сохранён на iPhone" : "Токен ещё не сохранён", systemImage: model.hasAPIToken ? "lock.shield.fill" : "key")
+                        .accessibilityIdentifier("token-saved-state")
+                    Button(model.checkingToken ? "Проверяю…" : "Проверить токен и подключение") { Task { await model.checkAPIToken() } }
+                        .disabled(!model.hasAPIToken || model.checkingToken).accessibilityIdentifier("check-api-token")
+                    Text(model.tokenMessage).font(.subheadline).foregroundStyle(Color.peach).accessibilityIdentifier("token-message")
+                    if model.hasAPIToken {
+                        Button("Удалить токен с iPhone", role: .destructive) { model.deleteAPIToken(); tokenDraft = "" }
+                            .accessibilityIdentifier("delete-api-token")
+                    }
+                    Text("Ключ хранится в Keychain, не показывается после сохранения, не попадает в исходники или URL. Доступ после первой разблокировки позволяет читать его ночью. Не публикуй свой ключ.")
+                        .font(.caption).foregroundStyle(Color.muted)
+                    Link("Документация alerts.in.ua", destination: URL(string: "https://devs.alerts.in.ua/")!)
+                }
+
                 Section("Где проверять тревогу") {
                     Button { choosingLocation = true } label: {
                         VStack(alignment: .leading, spacing: 6) {
@@ -250,9 +278,14 @@ struct SettingsView: View {
                 }
                 Section("Откуда брать данные тревог") {
                     Picker("Источник", selection: $model.prefs.dataSource) {
+                        Text("Личный токен · alerts.in.ua").tag(Optional("direct"))
                         Text("Без ключа · UA Siren").tag(Optional("public"))
                         Text("Мой сервер · alerts.in.ua").tag(Optional("proxy"))
                     }.accessibilityIdentifier("source-picker")
+                    if model.prefs.dataSource == "direct" {
+                        Text("Основной источник — alerts.in.ua по токену вверху настроек. Проверка не чаще раза в 15 секунд; при ошибках API пауза увеличивается. Ошибка ключа или сети не считается отбоем. Для фоновых проверок нужен ночной режим со звуком для сна.")
+                            .font(.subheadline).foregroundStyle(Color.muted)
+                    }
                     Text("UA Siren — публичный сторонний сервис. Ключ и свой сервер не нужны. Нужен интернет. Проверка — примерно каждые 15 секунд: при открытом приложении или подтверждённом ночном фоне.")
                         .font(.subheadline).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
                     if model.prefs.dataSource == "proxy" {
@@ -269,11 +302,12 @@ struct SettingsView: View {
                 Section("Важно знать") {
                     Text("Настройки относятся к следующему сигналу. Текущий отключи и установи заново, чтобы применить изменения.")
                     Text("Это не приложение гражданской защиты. «Нет тревоги» не подтверждает безопасность. Не отключай официальные оповещения и резерв в «Часах».")
-                    Text("Версия 0.6: проверяется в симуляторе. Короткий тест симулятора не заменяет ночное испытание на реальном iPhone.")
+                    Text("Версия 0.7: проверяется в симуляторе. Короткий тест симулятора не заменяет ночное испытание на реальном iPhone.")
                 }
             }.scrollContentBackground(.hidden).background(Color.night).navigationTitle("Настройки")
                 .sheet(isPresented: $choosingLocation) { LocationPicker(model: model) }
-        }.onChange(of: model.prefs.region) { _, _ in model.savePreferences() }
+        }.onDisappear { tokenDraft = "" }
+            .onChange(of: model.prefs.region) { _, _ in model.savePreferences() }
             .onChange(of: model.prefs.sound) { _, _ in model.savePreferences() }
             .onChange(of: model.prefs.experimental) { _, _ in model.savePreferences() }
             .onChange(of: model.prefs.maxDelayMinutes) { _, _ in model.savePreferences() }
