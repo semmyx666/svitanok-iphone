@@ -28,6 +28,9 @@ targets:
         "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": scripts/simulator-keychain.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   SvitanokTests:
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     type: bundle.unit-test
     platform: iOS
     sources:
@@ -35,6 +38,9 @@ targets:
     dependencies:
       - target: Svitanok
   SvitanokUITests:
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     type: bundle.ui-testing
     platform: iOS
     sources:
