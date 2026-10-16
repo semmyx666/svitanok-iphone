@@ -37,14 +37,15 @@ final class InterfaceTests: XCTestCase {
     }
     func testSettingsExplainLockedScreenLimit() {
         app.tabBars.buttons["Настройки"].tap()
-        XCTAssertTrue(app.buttons["choose-location-settings"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Обычный сигнал работает с закрытым экраном"].exists)
+        let limit = app.staticTexts["Обычный сигнал работает с закрытым экраном"]
+        for _ in 0..<10 { if limit.exists && limit.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(limit.exists)
         capture("05-settings-iPhone")
     }
     func testPublicSourceNeedsNoServerField() {
         app.tabBars.buttons["Настройки"].tap()
         let picker = app.descendants(matching: .any).matching(identifier: "source-picker").firstMatch
-        for _ in 0..<6 {
+        for _ in 0..<12 {
             if picker.exists && picker.isHittable { break }
             app.swipeUp()
         }
@@ -52,6 +53,22 @@ final class InterfaceTests: XCTestCase {
         XCTAssertTrue(picker.isHittable)
         XCTAssertFalse(app.textFields["HTTPS-адрес сервера"].exists)
         capture("06-public-source-settings-iPhone")
+    }
+
+    func testTokenFieldSavePersistsAndDelete() {
+        app.tabBars.buttons["Настройки"].tap()
+        let field=app.secureTextFields["alerts-api-token"]
+        XCTAssertTrue(field.waitForExistence(timeout:10))
+        field.tap();field.typeText("ui-test-not-a-real-token")
+        app.buttons["save-api-token"].tap()
+        XCTAssertTrue(app.staticTexts["Токен сохранён на iPhone"].waitForExistence(timeout:5))
+        capture("15-api-token-saved")
+        app.terminate();app.launch();app.tabBars.buttons["Настройки"].tap()
+        XCTAssertTrue(app.staticTexts["Токен сохранён на iPhone"].waitForExistence(timeout:10))
+        XCTAssertFalse(app.staticTexts["ui-test-not-a-real-token"].exists)
+        app.buttons["delete-api-token"].tap()
+        XCTAssertTrue(app.staticTexts["Токен ещё не сохранён"].waitForExistence(timeout:5))
+        capture("16-api-token-deleted")
     }
 
 }

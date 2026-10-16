@@ -21,7 +21,7 @@ for path in (root / "ios/Svitanok/Resources").glob("*.wav"):
         assert f.getnchannels() == 1 and f.getsampwidth() == 2
         assert 0 < f.getnframes() / f.getframerate() < 30
 assert not (root / "server/.env").exists()
-assert len(list((root / "ios/Svitanok").glob("*.swift"))) == 9
+assert len(list((root / "ios/Svitanok").glob("*.swift"))) == 11
 assert (root / "ios/Svitanok/Assets.xcassets/AppIcon.appiconset/AppIcon.png").exists()
 workflow = yaml.safe_load((root / ".github/workflows/build-ios.yml").read_text())
 assert set(workflow["on"]) == {"workflow_dispatch"}

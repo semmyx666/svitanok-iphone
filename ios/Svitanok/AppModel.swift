@@ -10,7 +10,11 @@ final class AppModel {
     var selectedDate: Date
     var snapshot: Snapshot?
     var message = "Установите будильник и проверьте его коротким тестом."
-    var networkMessage = "Сервер ещё не подключён"
+    var networkMessage = "Подключение к alerts.in.ua ещё не проверено"
+    var tokenMessage = "Вставь личный токен из письма alerts.in.ua."
+    var hasAPIToken = (try? TokenStore.read()) != nil
+    var checkingToken = false
+    private var tokenRevision = 0
     var challenge: WakeChallenge?
     var challengeError = ""
     var ringingInApp = false
@@ -30,7 +34,13 @@ final class AppModel {
     init() {
         let calendar = Calendar.current
         selectedDate = calendar.nextDate(after: .now, matching: DateComponents(hour: 6, minute: 30), matchingPolicy: .nextTime) ?? Date.now.addingTimeInterval(3600)
-        if !["public", "proxy"].contains(prefs.dataSource ?? "") { prefs.dataSource = "public" }
+        if !UserDefaults.standard.bool(forKey: "alerts-direct-07") {
+            prefs.dataSource = "direct"
+            Persistence.save(prefs, key: "preferences")
+            UserDefaults.standard.set(true, forKey: "alerts-direct-07")
+        }
+        if !["direct", "public", "proxy"].contains(prefs.dataSource ?? "") { prefs.dataSource = "direct" }
+        if hasAPIToken { tokenMessage = "Токен сохранён в защищённом хранилище iPhone. Проверь подключение." }
         if prefs.dataSource == "public" { networkMessage = "Подключение к UA Siren без API-ключа…" }
         if !Region.all.indices.contains(prefs.region) { prefs.region = 9 }
         if prefs.locationUID != nil && AlertLocation.find(prefs.locationUID) == nil { prefs.locationUID = nil }
@@ -46,6 +56,8 @@ final class AppModel {
         let region = plan?.region ?? prefs.region
         return Region.all.first(where: { $0.id == region })?.name ?? "Неизвестный регион"
     }
+    var activeDataSource: String { (plan != nil ? (plan?.dataSource ?? "proxy") : prefs.dataSource) ?? "direct" }
+    var usesDirectSource: Bool { activeDataSource == "direct" }
     var usesPublicSource: Bool { (plan != nil ? (plan?.dataSource ?? "proxy") : prefs.dataSource) == "public" }
     var queryLocationUID: Int? {
         let uid = plan != nil ? plan?.locationUID : prefs.locationUID
@@ -59,6 +71,37 @@ final class AppModel {
         case .clear: "Источник не сообщает воздушную тревогу"
         case .unknown: "Статус неизвестен"
         }
+    }
+    func saveAPIToken(_ value: String) {
+        do {
+            try TokenStore.save(value); hasAPIToken = true; tokenRevision += 1
+            prefs.dataSource = "direct"; savePreferences()
+            snapshot = nil; lastAttempt = .distantPast
+            tokenMessage = "Токен сохранён. Нажми «Проверить токен и подключение»." + (plan != nil ? " Текущий будильник использует прежние настройки: отключи и установи его заново." : "")
+        } catch { tokenMessage = error.localizedDescription }
+    }
+    func deleteAPIToken() {
+        do {
+            try TokenStore.delete(); hasAPIToken = false; tokenRevision += 1; snapshot = nil
+            tokenMessage = "Токен удалён с этого iPhone. Системные сигналы не отключены."
+        } catch { tokenMessage = error.localizedDescription }
+    }
+    func checkAPIToken() async {
+        guard !checkingToken else { return }
+        checkingToken = true; defer { checkingToken = false }
+        let uid = prefs.locationUID
+        let region = prefs.region
+        let revision = tokenRevision
+        do {
+            let result = try await AlertsAPI.shared.fetch(uid: uid)
+            guard revision == tokenRevision else { return }
+            let status = result.status(region: region, uid: uid, now: .now)
+            guard status != .unknown else { throw AlertsAPIError.invalidResponse }
+            let label = status == .active ? "воздушная тревога" : (status == .partial ? "тревога в части области" : "источник не сообщает воздушную тревогу")
+            if plan == nil && prefs.dataSource == "direct" && prefs.locationUID == uid && prefs.region == region { snapshot = result }
+            tokenMessage = "Подключено к alerts.in.ua. Токен принят. Выбранная местность: \(label)."
+            if plan != nil { tokenMessage += " Для применения источника к текущему будильнику отключи его и установи заново." }
+        } catch { tokenMessage = error.localizedDescription }
     }
     func savePreferences() { Persistence.save(prefs, key: "preferences") }
     func updateForeground(_ active: Bool) {
@@ -161,6 +204,10 @@ final class AppModel {
         } catch { message = "Отключение не завершено: \(error.localizedDescription). Проверьте разрешение будильников." }
     }
     func endpoint() throws -> URL {
+        if usesDirectSource {
+            guard try TokenStore.read() != nil else { throw AlertsAPIError.missingToken }
+            return try AlertsAPI.endpoint(uid: queryLocationUID)
+        }
         if usesPublicSource {
             guard let uid = queryLocationUID, PublicCatalog.find(uid) != nil,
                   let url = URL(string: "https://siren.pp.ua/api/v3/alerts/\(uid)") else { throw WakeError.invalidResponse }
@@ -193,18 +240,26 @@ final class AppModel {
             networkMessage = "ТЕСТ. Искусственные статусы, не настоящая тревога."
             await evaluate(); return
         }
+        if usesDirectSource && plan == nil && !force { return }
         if ProcessInfo.processInfo.arguments.contains("--offline-ui-test") { networkMessage = "Проверка интерфейса без сети. Тревога и отбой не определены."; return }
         let now = Date.now
         guard force || now.timeIntervalSince(lastAttempt) >= 15 else { return }
         lastAttempt = now
         fetching = true; defer { fetching = false }
         do {
+            let revision = tokenRevision
+            let source = activeDataSource
+            let selectedUID = queryLocationUID
+            let selectedRegion = plan?.region ?? prefs.region
+            let candidate: Snapshot
+            if usesDirectSource {
+                candidate = try await AlertsAPI.shared.fetch(uid: selectedUID)
+            } else {
             let url = try endpoint()
             var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw WakeError.invalidResponse }
-            let candidate: Snapshot
             if usesPublicSource {
                 guard http.url?.host == "siren.pp.ua", http.url?.scheme == "https", let uid = queryLocationUID else { throw WakeError.invalidResponse }
                 candidate = try PublicAlerts.parse(data, uid: uid, serverDate: http.value(forHTTPHeaderField: "Date"), now: .now)
@@ -212,13 +267,17 @@ final class AppModel {
                 guard data.count < 16_384 else { throw WakeError.invalidResponse }
                 candidate = try JSONDecoder().decode(Snapshot.self, from: data)
             }
+            }
+            guard revision == tokenRevision, source == activeDataSource, selectedUID == queryLocationUID,
+                  selectedRegion == (plan?.region ?? prefs.region) else { return }
             guard candidate.source == (usesPublicSource ? "siren.pp.ua" : "alerts.in.ua"),
                   candidate.status(region: plan?.region ?? prefs.region, uid: queryLocationUID, now: .now) != .unknown else { throw WakeError.invalidResponse }
             guard executionAllowed else { return }
-            snapshot = candidate; networkMessage = usesPublicSource ? "Ответ UA Siren получен. Без ключа и своего сервера. Это сторонний источник, возможны задержки." : "Ответ alerts.in.ua получен через ваш сервер."
+            snapshot = candidate; networkMessage = usesDirectSource ? "Ответ alerts.in.ua получен напрямую по личному токену. Возможны задержки источника." : usesPublicSource ? "Ответ UA Siren получен. Без ключа и своего сервера. Это сторонний источник, возможны задержки." : "Ответ alerts.in.ua получен через ваш сервер."
             await evaluate()
         } catch {
             snapshot = nil
+            if usesDirectSource { networkMessage = (error as? AlertsAPIError)?.localizedDescription ?? AlertsAPIError.network.localizedDescription; return }
             if usesPublicSource { networkMessage = "UA Siren недоступен или ответ не подтверждён. Тревога/отбой неизвестны. Не отключайте резерв."; return }
             networkMessage = prefs.serverURL.isEmpty ? "Источник не подключён. Будильник работает только по времени." : "Нет свежих данных. Для районов нужен сервер версии 0.3. Перенос сейчас недоступен."
         }
