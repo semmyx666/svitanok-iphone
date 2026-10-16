@@ -20,12 +20,25 @@ sys.exit("Установите iOS 26+ Simulator в Xcode Settings → Component
 mkdir -p build/logs
 printf '%s\n' "$SIM_ID" > build/logs/test-simulator-id.txt
 RESULT_PATH="build/Tests-$(date +%Y%m%d-%H%M%S).xcresult"
-ACTION=test
-if [[ "${PROBE_ONLY:-false}" == true ]]; then ACTION=build-for-testing; fi
+# Unsigned simulator apps cannot access Keychain (errSecMissingEntitlement).
+# Build first, then ad-hoc sign this simulator-only product with a test app identity.
+# No developer account/certificate is used, and device IPA remains unsigned.
 xcodebuild -project Svitanok.xcodeproj -scheme Svitanok \
   -destination "platform=iOS Simulator,id=$SIM_ID" \
+  -derivedDataPath build/test -resultBundlePath "${RESULT_PATH%.xcresult}-build.xcresult" \
+  CODE_SIGNING_ALLOWED=NO build-for-testing
+SIM_APP="build/test/Build/Products/Debug-iphonesimulator/Svitanok.app"
+test -d "$SIM_APP"
+codesign --force --deep --sign - --entitlements scripts/simulator-keychain.plist "$SIM_APP"
+codesign -d --entitlements :- "$SIM_APP" > build/logs/simulator-entitlements.plist 2>/dev/null
+if [[ "${PROBE_ONLY:-false}" == true ]]; then exit 0; fi
+set +e
+xcodebuild -project Svitanok.xcodeproj -scheme Svitanok \
+  -destination "platform=iOS Simulator,id=$SIM_ID" -parallel-testing-enabled NO \
   -derivedDataPath build/test -resultBundlePath "$RESULT_PATH" \
-  CODE_SIGNING_ALLOWED=NO -skip-testing:SvitanokUITests/NightProbeTests -skip-testing:SvitanokUITests/WakeProbeTests "$ACTION"
-
+  CODE_SIGNING_ALLOWED=NO -skip-testing:SvitanokUITests/NightProbeTests -skip-testing:SvitanokUITests/WakeProbeTests test-without-building
+TEST_RESULT=$?
+set -e
 mkdir -p build/logs/ui-screenshots
-if [[ "$ACTION" == test ]]; then xcrun xcresulttool export attachments --path "$RESULT_PATH" --output-path build/logs/ui-screenshots; fi
+xcrun xcresulttool export attachments --path "$RESULT_PATH" --output-path build/logs/ui-screenshots || true
+exit "$TEST_RESULT"

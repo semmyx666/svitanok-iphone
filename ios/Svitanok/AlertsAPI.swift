@@ -1,12 +1,13 @@
 import Foundation
 
 enum AlertsAPIError: LocalizedError, Equatable {
-    case missingToken, invalidToken, keychain, unauthorized, forbidden, throttled, server, invalidResponse, network
+    case missingToken, invalidToken, unauthorized, forbidden, throttled, server, invalidResponse, network
+    case keychain(Int32)
     var errorDescription: String? {
         switch self {
         case .missingToken: "Вставь токен из письма alerts.in.ua в Настройки → API-токен alerts.in.ua и нажми «Сохранить токен»."
         case .invalidToken: "Токен не сохранён: вставь только ключ из письма, без пробелов внутри и без слова Bearer."
-        case .keychain: "Не удалось открыть защищённое хранилище iPhone. Разблокируй устройство и попробуй снова."
+        case .keychain(let code): "Не удалось открыть защищённое хранилище iPhone (код \(code)). Разблокируй устройство и попробуй снова."
         case .unauthorized: "alerts.in.ua: токен не принят (401). Проверь ключ и активацию ответом на письмо."
         case .forbidden: "alerts.in.ua запретил доступ (403). Возможна блокировка IP или ограничение по стране."
         case .throttled: "Пауза между запросами alerts.in.ua. Подожди; повторная проверка выполняется автоматически. При 429 пауза увеличивается."
